@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.13
+# v0.19.11
 
 using Markdown
 using InteractiveUtils
@@ -28,9 +28,25 @@ begin
 	Random.seed!(123)
 end
 
+# ╔═╡ f53f1d9f-8be8-4dcc-a637-f39b1eaacd63
+md"""
+**Astro 497 Project**
+# Analyze Orbit Parameters and Planet Mass
+"""
+
+# ╔═╡ 8cf8e22c-af0f-422b-89a1-109291cd749a
+TableOfContents()
+
+# ╔═╡ 6d090107-d691-4a68-91ad-c7dae5df35ad
+md"""
+### Overview 
+Our project aims to construct a dashboard that ingests radial velocity observation data and analyzes orbit parameters and planet mass. In our dashboard, we
+will utilize The California Legacy Survey (Rosenthal et al., 2021) data.
+"""
+
 # ╔═╡ 8f829f16-553a-11ed-3fd9-9f77ddd265d5
 md"""
-# Ingest Data
+# Ingest & select RV data to be analyzed
 """
 
 # ╔═╡ a6eedc20-0171-48c7-938f-daee0ce4f8e9
@@ -63,8 +79,8 @@ df_all
 
 # ╔═╡ e71bdd5e-a50e-46b2-8249-55ad7dffb789
 begin
-	select_obs_cell_id = PlutoRunner.currently_running_cell_id[] |> string
-	select_obs_cell_url = "#$(select_obs_cell_id)"
+	select_star_id = PlutoRunner.currently_running_cell_id[] |> string
+	select_star_url = "#$(select_star_id)"
 	
 md"""
 Please select a star to be analyzed: $(@bind selected_star Select(collect(values(star_names)); default="10002"))
@@ -72,8 +88,105 @@ Please select a star to be analyzed: $(@bind selected_star Select(collect(values
 
 end
 
+# ╔═╡ 08f0978c-a04c-452a-87e6-ca6df2fb5893
+md"""
+The name of the star we select to analyze is:
+"""
+
 # ╔═╡ 87ad2397-39a1-4d1e-b8c2-883639d99015
 selected_star
+
+# ╔═╡ 519b083c-aa8d-48da-b9ec-6e3cddf94d99
+starid = searchsortedfirst(star_names,selected_star);
+
+# ╔═╡ f3bbb76c-14cd-4566-935b-5c1f6949eaf5
+begin
+	star_name = star_names[starid]
+	df_star = df_all |> @filter( _.Name == star_name ) |> DataFrame
+end;
+
+# ╔═╡ 4a949edb-8737-4439-a1c0-14641bd99f8c
+md"""
+Group data according to which instrument made the observation, so we can analyze each dataset separately.
+"""
+
+# ╔═╡ 2350b4a6-a538-430e-b832-4ecb4a458c4d
+begin
+	df_star_by_inst = DataFrame()
+	try
+	df_star_by_inst = df_star |> @groupby( _.Inst ) |> @map( {bjd = _.d, rv = _.RVel, σrv = _.e_RVel, inst= key(_), nobs_inst=length(_) }) |> DataFrame;
+	catch
+	end
+end;
+
+# ╔═╡ 2de85bb1-881f-483a-bcdb-2109ed795ec5
+ begin  # Make more useful observatory/instrument labels
+	instrument_label = Dict(zip(["j","k","apf","lick"],["Keck (post)","Keck (pre)","APF","Lick"]))
+	for k in keys(instrument_label)
+		if k ∉ df_star_by_inst.inst
+			delete!(instrument_label,k)
+		end
+	end
+	instrument_label
+end;
+
+# ╔═╡ bfc1affc-b392-4884-a35f-55593af7db53
+t_offset = 2455000; 
+
+# ╔═╡ 6f000c6d-14a8-4d6d-97f8-d01f4dd516bc
+begin
+	plt_rv_all_inst = plot() #legend=:none, widen=true)
+	local num_inst = size(df_star_by_inst,1)
+	for inst in 1:num_inst
+		rvoffset = mean(df_star_by_inst[inst,:rv])
+		scatter!(plt_rv_all_inst,df_star_by_inst[inst,:bjd].-t_offset,
+				df_star_by_inst[inst,:rv].-rvoffset,
+				yerr=collect(df_star_by_inst[inst,:σrv]),
+				label=instrument_label[df_star_by_inst[inst,:inst]], markercolor=inst)
+				#markersize=4*upscale, legendfontsize=upscale*12
+	end
+	xlabel!(plt_rv_all_inst,"Time (d)")
+	ylabel!(plt_rv_all_inst,"RV (m/s)")
+	title!(plt_rv_all_inst,"HD " * star_name )
+	plt_rv_all_inst
+end
+
+# ╔═╡ 383d9191-fc82-4f9c-81f5-837a67c71e9b
+begin
+	select_obs_cell_id = PlutoRunner.currently_running_cell_id[] |> string
+	select_obs_cell_url = "#$(select_obs_cell_id)"
+	md"""
+Select which instrument's data to analyze below: $(@bind inst_to_plt Select(collect(values(instrument_label)); default="Keck (post)"))
+"""
+end
+
+# ╔═╡ 273ced03-5f28-4204-9138-97a8db362aeb
+inst_idx = findfirst(isequal(inst_to_plt),map(k->instrument_label[k], df_star_by_inst[:,:inst]));
+
+# ╔═╡ 7518d036-d2e9-4877-9aa8-dd26cceee700
+begin
+	plt_1inst = plot(xlabel="Time (d)", ylabel="RV (m/s)", title="Zoom in on RVs from instrument being fit")
+	scatter!(plt_1inst, df_star_by_inst[inst_idx,:bjd].-t_offset,df_star_by_inst[inst_idx,:rv],yerr=df_star_by_inst[inst_idx,:σrv], label=instrument_label[df_star_by_inst[inst_idx,:inst]], markercolor=inst_idx)
+end
+
+# ╔═╡ 0b49db68-973a-42e0-8eed-4f4405b5f808
+md"""
+# Fitting RV Model to data
+"""
+
+# ╔═╡ e3ee5bbf-9bd2-4e3a-9e4b-9328871ec65e
+md"""
+Ground-based astronomical observations  observations are very rarely evenly spaced.
+The corresponding method for unevenly sampled data would be the Lomb-Scargle periodogram or some generalizations(e.g., the maximum log likelihood as a function of orbital period or the marginal log a posteriori probability as a function of orbital period).
+"""
+
+# ╔═╡ acff1e9d-038c-4267-9f85-37e21122988c
+
+
+# ╔═╡ a494b98a-08df-464c-b3f4-584463f4210c
+md"""
+# Plots and Figures
+"""
 
 # ╔═╡ 769de9c4-6167-4550-be08-320c7c63fe3e
 md"""
@@ -103,7 +216,7 @@ Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 
 [compat]
 CSV = "~0.10.7"
-DataFrames = "~1.4.1"
+DataFrames = "~1.4.2"
 Distributions = "~0.25.76"
 ForwardDiff = "~0.10.32"
 LaTeXStrings = "~1.3.0"
@@ -382,9 +495,9 @@ version = "1.12.0"
 
 [[deps.DataFrames]]
 deps = ["Compat", "DataAPI", "Future", "InvertedIndices", "IteratorInterfaceExtensions", "LinearAlgebra", "Markdown", "Missings", "PooledArrays", "PrettyTables", "Printf", "REPL", "Random", "Reexport", "SnoopPrecompile", "SortingAlgorithms", "Statistics", "TableTraits", "Tables", "Unicode"]
-git-tree-sha1 = "558078b0b78278683a7445c626ee78c86b9bb000"
+git-tree-sha1 = "5b93f1b47eec9b7194814e40542752418546679f"
 uuid = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
-version = "1.4.1"
+version = "1.4.2"
 
 [[deps.DataStructures]]
 deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
@@ -1833,11 +1946,29 @@ version = "1.4.1+0"
 """
 
 # ╔═╡ Cell order:
+# ╟─f53f1d9f-8be8-4dcc-a637-f39b1eaacd63
+# ╠═8cf8e22c-af0f-422b-89a1-109291cd749a
+# ╟─6d090107-d691-4a68-91ad-c7dae5df35ad
 # ╟─8f829f16-553a-11ed-3fd9-9f77ddd265d5
-# ╠═a6eedc20-0171-48c7-938f-daee0ce4f8e9
+# ╟─a6eedc20-0171-48c7-938f-daee0ce4f8e9
 # ╠═6162976e-34ff-498a-ac7c-3dafd80fb4a4
-# ╠═e71bdd5e-a50e-46b2-8249-55ad7dffb789
-# ╠═87ad2397-39a1-4d1e-b8c2-883639d99015
+# ╟─e71bdd5e-a50e-46b2-8249-55ad7dffb789
+# ╟─08f0978c-a04c-452a-87e6-ca6df2fb5893
+# ╟─87ad2397-39a1-4d1e-b8c2-883639d99015
+# ╠═519b083c-aa8d-48da-b9ec-6e3cddf94d99
+# ╠═f3bbb76c-14cd-4566-935b-5c1f6949eaf5
+# ╠═4a949edb-8737-4439-a1c0-14641bd99f8c
+# ╠═2350b4a6-a538-430e-b832-4ecb4a458c4d
+# ╠═2de85bb1-881f-483a-bcdb-2109ed795ec5
+# ╠═bfc1affc-b392-4884-a35f-55593af7db53
+# ╠═6f000c6d-14a8-4d6d-97f8-d01f4dd516bc
+# ╠═383d9191-fc82-4f9c-81f5-837a67c71e9b
+# ╠═273ced03-5f28-4204-9138-97a8db362aeb
+# ╟─7518d036-d2e9-4877-9aa8-dd26cceee700
+# ╟─0b49db68-973a-42e0-8eed-4f4405b5f808
+# ╠═e3ee5bbf-9bd2-4e3a-9e4b-9328871ec65e
+# ╠═acff1e9d-038c-4267-9f85-37e21122988c
+# ╠═a494b98a-08df-464c-b3f4-584463f4210c
 # ╟─769de9c4-6167-4550-be08-320c7c63fe3e
 # ╠═7c2ceba1-6e8a-4a5f-845d-73b97810c099
 # ╟─00000000-0000-0000-0000-000000000001
