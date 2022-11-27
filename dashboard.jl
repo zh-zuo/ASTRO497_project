@@ -201,6 +201,11 @@ Ground-based astronomical observations are very rarely evenly spaced.
 The corresponding method for unevenly sampled data would be the Lomb-Scargle periodogram or some generalizations(e.g., the maximum log likelihood as a function of orbital period or the marginal log a posteriori probability as a function of orbital period).
 """
 
+# ╔═╡ 25879a59-5aaa-40de-a289-998cda21448d
+md"""
+Choose one dataset to plot lomb-Scargle
+"""
+
 # ╔═╡ ec77269a-6cf8-420f-a7ef-75f15e30de28
 md"""
 Period with maximum power:
@@ -215,6 +220,64 @@ md"""
 md"""
 Radio velocity with respect to phase. The RV value for diffrerent instruments are randomly separted.
 """
+
+# ╔═╡ a435c976-de91-40a6-b536-9cf005027a3b
+if size(df_star_by_inst,1)>0  # Warning: Assume exactly 2 instruments providing RV data
+    data1 = (t=collect(df_star_by_inst[1,:bjd]).-t_offset, rv=collect(df_star_by_inst[1,:rv]), σrv=collect(df_star_by_inst[1,:σrv]))
+    if size(df_star_by_inst,1) > 1
+        data2 = (t=collect(df_star_by_inst[2,:bjd]).-t_offset, rv=collect(df_star_by_inst[2,:rv]), σrv=collect(df_star_by_inst[2,:σrv]))
+    else
+        data2 = (t=Float64[], rv=Float64[], σrv=Float64[])
+    end
+    t_mean = (sum(data1.t)+sum(data2.t))/(length(data1.t).+length(data2.t))
+    t_plt = range(minimum(vcat(data1.t,data2.t)), stop=maximum(vcat(data1.t,data2.t)), step=1.0)
+end;
+
+# ╔═╡ 1121402e-69d9-4d3b-bec9-c4011e226675
+begin
+	#s=df_star[(df_star[:,:Inst].=="k") .||(df_star[:,:Inst].=="j"),:RVel]
+	#t=df_star[(df_star[:,:Inst].=="k").||(df_star[:,:Inst].=="j"),:d]
+	#s=df_star[:,:RVel]
+	#t=df_star[:,:d]
+	t=data2.t
+	s=data2.rv
+	D=maximum(t)-minimum(t) #Duration of observations
+	plan = LombScargle.plan(t, s,minimum_frequency=1/D)
+	pgram = lombscargle(plan)
+	plot(periodpower(pgram)...)
+	fap=LombScargle.fapinv(pgram,0.0001)
+	fap2=LombScargle.fapinv(pgram,0.01)
+	hline!([fap fap])
+	hline!([fap2 fap2])
+end
+
+# ╔═╡ b8ec7c40-5075-4cd9-89dd-b649e53d8558
+P0=LombScargle.findmaxperiod(pgram)
+
+
+# ╔═╡ 17b1760d-ed77-4773-8147-43245c70a962
+begin
+	plt_phase_all = plot(widen=false)
+	num_inst = size(df_star_by_inst,1)
+	for inst in 1:num_inst
+		if length(df_star_by_inst[inst,:rv]) == 0 continue end
+		rvoffset = mean(df_star_by_inst[inst,:rv]) .- 30 .* (inst-2)
+		phase = mod.((df_star_by_inst[inst,:bjd].-t_offset)./P0,1.0)
+		scatter!(plt_phase_all,phase,
+				df_star_by_inst[inst,:rv].-rvoffset,
+				yerr=collect(df_star_by_inst[inst,:σrv]),
+				markersize=2, markerstrokewidth=0.5,
+				label=instrument_label[df_star_by_inst[inst,:inst]])
+	end
+	#plot!(plt,t_plt,pred_1pl, label=:none)
+	xlabel!(plt_phase_all,"Phase")
+	ylabel!(plt_phase_all,"RV (m/s)")
+	title!(plt_phase_all,"HD " * star_name )
+	plt_phase_all
+end
+
+# ╔═╡ 163fd9dc-daed-489c-bd23-ff2ae816c69d
+data1
 
 # ╔═╡ 0b49db68-973a-42e0-8eed-4f4405b5f808
 md"""
@@ -253,11 +316,11 @@ model: v=c1+c2*t. A: design matrix, b: bjd
 
 # ╔═╡ 640c9851-73ba-47ed-84e4-6484f3b793b2
 begin
-	nobs = size(df_star_selected,1)
-	A = [ones(nobs) df_star_selected.d-2455000*ones(nobs)]
-	b=df_star_selected.RVel
-	covar = diagm(df_star_selected.e_RVel.^2)
-	θ_mle = calc_mle_linear_model(A, b, covar)
+	nobs2 = size(data2.t)[1]
+	A2 = [ones(nobs2) data2.t-2455000*ones(nobs2)]
+	b2=data2.rv
+	covar2 = diagm(data2.σrv.^2)
+	θ_mle2 = calc_mle_linear_model(A2, b2, covar2)
 end
 
 # ╔═╡ c806b3eb-9c0b-4a96-b21a-03cb17c4bc2c
@@ -266,39 +329,117 @@ loss function
 """
 
 # ╔═╡ 159b2a95-26d1-4017-9f3c-db8467ef7623
-loss(θ) = sum( ((predict_linear_model(A,θ).-df_star_selected.RVel)./df_star_selected.e_RVel).^2 )
+loss(A,θ) = sum( ((predict_linear_model(A,θ).-data2.rv)./data2.σrv).^2 )
 
 # ╔═╡ 36e7d4ab-735e-4517-bf2e-ae1db69d227e
-loss_at_mle = loss(θ_mle)
+loss_at_mle2 = loss(A2,θ_mle2)
+
+# ╔═╡ d63c6ac8-3623-426e-b25f-668ffce47ddd
+let
+	expected_distribution = Chisq(nobs2)
+	est_max_y = maximum(pdf.(expected_distribution,range(nobs2/2,stop=1.5*nobs2,length=100)))
+
+	plt = plot(expected_distribution, xlabel="loss", ylabel="Probability", legend=:none)
+	plot!(plt,[loss_at_mle2,loss_at_mle2],[0,est_max_y], linestyle=:dot, linecolor=:black)
+end
 
 # ╔═╡ 3b21b28a-52f0-4da0-beba-bb09d666b9c6
 md"""
 # Fitting one planet model
 """
 
-# ╔═╡ cc68ee1c-f252-4f12-90e5-9caa7a4e519d
+# ╔═╡ acff1e9d-038c-4267-9f85-37e21122988c
+# ╠═╡ skip_as_script = true
+#=╠═╡
 md"""
-We used the Probabilistic Programming Languages (PPLs) approach. Please note that the above results are very problematic. We haven't figured out the problem.
+if size(df_star_by_inst,1)>0  # Warning: Picks RVs from only 1 instrument
+	data = ( t=collect(df_star_by_inst[inst_idx,:bjd]).-t_offset,
+			rv=collect(df_star_by_inst[inst_idx,:rv]),
+			σrv=collect(df_star_by_inst[inst_idx,:σrv]) )
+	t_mean = mean(data.t)
+	t_plt = range(minimum(data.t), stop=maximum(data.t), step=1.0)
+	phase_plt = range(0.0, stop=1, length=100)
+else
+	data = (t=Float64[], rv=Float64[], σrv=Float64[])
+end;
+"""
+  ╠═╡ =#
+
+# ╔═╡ f46cbed8-dec6-4bb2-8942-4fe96ebea3e4
+#md"""
+#P: $(@bind P_guess NumberField(1:0.1:100, default=P0[1]))
+#K: $(@bind K_guess NumberField(0:0.1:20, default=5))
+#e: $(@bind e_guess NumberField(0:0.05:1, default=0.1))
+#ω: $(@bind ω_guess NumberField(0:0.05:2π, default=0))
+#h: $(@bind h_guess NumberField(0:0.05:2π, default=0))
+#k: $(@bind k_guess NumberField(0:0.05:2π, default=0))
+#M₀: $(@bind M0_plt NumberField(0:0.05:2π, default=0))
+#"""
+
+# ╔═╡ 3862a20f-672e-4d61-aba8-41565b2a79ae
+begin
+	P_guess = 4.230785  # for 51 Peg b
+	h_guess = 0.01
+	k_guess = 0.01
+	C_guess = mean(data1.rv)
+	σj_guess = 3.0
+end;
+
+# ╔═╡ f71d567d-d026-4859-b74d-87bc278b01be
+mean(data1.rv)
+
+# ╔═╡ b6753753-48c6-4fc3-92a5-061fd2f8d37f
+begin
+	
+	init_guess=[P0[1],54.0364,-0.01,0.01,4.79533,-1.5415,0.0001,3.0]
+	# P, K, h, k, C, ?, sigma
+	#[P_guess,K_guess,e_guess,ω_guess,h_guess,k_guess,M0_minus_ω_guess,C_guess,σj_guess]
+
+	#map_estimate = optimize(model_given_data, MAP(), init_guess,  Optim.Options(f_tol=1e-5,store_trace = true,show_trace = true) )
+end;
+
+# ╔═╡ a494b98a-08df-464c-b3f4-584463f4210c
+md"""
+# Model Assessment
 """
 
-# ╔═╡ 0a4b48c3-79bb-4f32-a3ce-75121fc35151
+# ╔═╡ 769de9c4-6167-4550-be08-320c7c63fe3e
+md"""
+# Set Up
+"""
+
+# ╔═╡ 6cea0d3e-daed-4318-83b0-13bf9fe00d2a
 function calc_true_anom(ecc_anom::Real, e::Real)
 	true_anom = 2*atan(sqrt((1+e)/(1-e))*tan(ecc_anom/2))
 end
 
-# ╔═╡ 6aa94932-4e03-4eb5-981b-03e98bc7d759
-begin
-	function ecc_anom_init_guess_danby(M::Real, ecc::Real)
-    @assert -2π<= M <= 2π
-    @assert 0 <= ecc <= 1.0
-    if  M < zero(M)
-        M += 2π
-    end
-    E = (M<π) ? M + 0.85*ecc : M - 0.85*ecc
-	end;
-end
+# ╔═╡ c67d1588-36e4-44aa-a98b-8308bf57e1e0
+"""
+   `ecc_anom_init_guess_danby(mean_anomaly, eccentricity)`
 
-# ╔═╡ 728d106f-fddc-4b79-908a-1b3be0ec0e89
+Returns initial guess for the eccentric anomaly for use by iterative solvers of Kepler's equation for bound orbits.
+
+Based on "The Solution of Kepler's Equations - Part Three"
+Danby, J. M. A. (1987) Journal: Celestial Mechanics, Volume 40, Issue 3-4, pp. 303-312 (1987CeMec..40..303D)
+"""
+function ecc_anom_init_guess_danby(M::Real, ecc::Real)
+	@assert -2π<= M <= 2π
+	@assert 0 <= ecc <= 1.0
+    if  M < zero(M)
+		M += 2π
+	end
+    E = (M<π) ? M + 0.85*ecc : M - 0.85*ecc
+end;
+
+# ╔═╡ d892f267-8a1f-41e8-9104-573ec424abc9
+"""
+   `update_ecc_anom_laguerre(eccentric_anomaly_guess, mean_anomaly, eccentricity)`
+
+Update the current guess for solution to Kepler's equation
+
+Based on "An Improved Algorithm due to Laguerre for the Solution of Kepler's Equation"
+   Conway, B. A.  (1986) Celestial Mechanics, Volume 39, Issue 2, pp.199-211 (1986CeMec..39..199C)
+"""
 function update_ecc_anom_laguerre(E::Real, M::Real, ecc::Real)
   #es = ecc*sin(E)
   #ec = ecc*cos(E)
@@ -312,7 +453,7 @@ function update_ecc_anom_laguerre(E::Real, M::Real, ecc::Real)
   return E-n*F/denom
 end;
 
-# ╔═╡ f8488b03-79cc-492a-8e1a-a922168f45d2
+# ╔═╡ 5dcd30d7-dd60-4b15-96a6-4b222e55d779
 begin
 	calc_ecc_anom_cell_id = PlutoRunner.currently_running_cell_id[] |> string
 	calc_ecc_anom_url = "#$(calc_ecc_anom_cell_id)"
@@ -351,7 +492,7 @@ begin
 	end;
 end
 
-# ╔═╡ a1541fe7-023b-43dc-95d2-fae2d6bd3fc5
+# ╔═╡ 0f2ee09b-1d31-4a34-9b0a-22e8b91f4303
 begin
 	""" Calculate RV from t, P, K, e, ω and M0	"""
 	function calc_rv_keplerian end
@@ -364,7 +505,14 @@ begin
 	end
 end
 
-# ╔═╡ 2e7eb972-1a23-4c2e-9eb8-2c1671b8de56
+# ╔═╡ ee34c025-55c9-4136-b8c8-6ddaa678431a
+""" Calculate RV from t, P, K, e, ω, M0	and C with optional slope and t_mean"""
+function model_1pl(t, P, K, e, ω, M, C; slope=0.0, t_mean = 0.0)
+    calc_rv_keplerian(t-t_mean,P,K,e,ω,M) + C + slope * (t-t_mean)
+end
+
+
+# ╔═╡ 74170a94-2014-45fd-9f1d-d476b1febf14
 begin
 	""" Calculate RV from t, P, K, e, ω, M0	and C"""
 	function calc_rv_keplerian_plus_const end
@@ -375,176 +523,209 @@ begin
 	end
 end
 
-# ╔═╡ 746bb4e7-83ee-4e3d-a152-85424f3efb56
-begin
-        struct ModifiedJeffreysPriorForScale{T1,T2,T3} <: ContinuousUnivariateDistribution where { T1, T2, T3 }
-                scale::T1
-                max::T2
-                norm::T3
-        end
-
-        function ModifiedJeffreysPriorForScale(s::T1, m::T2) where { T1, T2 }
-                @assert zero(s) < s && !isinf(s)
-                @assert zero(m) < m && !isinf(s)
-                norm = 1/log1p(m/s)         # Ensure proper normalization
-                ModifiedJeffreysPriorForScale{T1,T2,typeof(norm)}(s,m,norm)
-        end
-
-        function Distributions.rand(rng::AbstractRNG, d::ModifiedJeffreysPriorForScale{T1,T2,T3}) where {T1,T2,T3}
-                u = rand(rng)               # sample in [0, 1]
-                d.scale*(exp(u/d.norm)-1)   # inverse CDF method for sampling
-        end
-
-        function Distributions.logpdf(d::ModifiedJeffreysPriorForScale{T1,T2,T3}, x::Real) where {T1,T2,T3}
-                log(d.norm/(1+x/d.scale))
-        end
-
-        function Distributions.logpdf(d::ModifiedJeffreysPriorForScale{T1,T2,T3}, x::AbstractVector{<:Real})  where {T1,T2,T3}
-            output = zeros(x)
-                for (i,z) in enumerate(x)
-                        output[i] = logpdf(d,z)
-                end
-                return output
-        end
-
-        Distributions.minimum(d::ModifiedJeffreysPriorForScale{T1,T2,T3})  where {T1,T2,T3} = zero(T2)
-        Distributions.maximum(d::ModifiedJeffreysPriorForScale{T1,T2,T3})  where {T1,T2,T3} = d.max
-
-        custom_prob_dist_url = "#" * (PlutoRunner.currently_running_cell_id[] |> string)
-	ModifiedJeffreysPriorForScale
+# ╔═╡ 61379c75-6969-4652-b6ce-7e1e992f1f23
+""" Convert vector of (P,K,h,k,ω+M0) to vector of (P, K, e, ω, M0) """
+function PKhkωpM_to_PKeωM(x::Vector) 
+    (P, K, h, k, ωpM) = x
+    ω = atan(h,k)
+    return [P, K, sqrt(h^2+k^2), ω, ωpM-ω]
 end
 
-# ╔═╡ 1121402e-69d9-4d3b-bec9-c4011e226675
-begin
-	#s=df_star[(df_star[:,:Inst].=="k") .||(df_star[:,:Inst].=="j"),:RVel]
-	#t=df_star[(df_star[:,:Inst].=="k").||(df_star[:,:Inst].=="j"),:d]
-	s=df_star[:,:RVel]
-	t=df_star[:,:d]
-	D=maximum(t)-minimum(t) #Duration of observations
-	plan = LombScargle.plan(t, s,minimum_frequency=1/D)
-	pgram = lombscargle(plan)
-	plot(periodpower(pgram)...)
-	fap=LombScargle.fapinv(pgram,0.0001)
-	fap2=LombScargle.fapinv(pgram,0.01)
-	hline!([fap fap])
-	hline!([fap2 fap2])
+# ╔═╡ ba55bc10-fb52-4135-8e9e-b3977a7369f2
+# ╠═╡ disabled = true
+#=╠═╡
+function loss_1pl(θ) 
+    (P1, K1, h1, k1, Mpω1, C1, C2, slope, σj ) = θ
+    ( P1, K1, e1, ω1, M1 ) = PKhkωpM_to_PKeωM([P1, K1, h1, k1, Mpω1])
+    if e1>1 return 1e6*e1 end
+    rv_model1 = model_1pl.(data1.t,P1,K1,e1,ω1,M1,C1, slope=slope, t_mean=t_mean)
+    loss = 0.5*sum(((rv_model1.-data1.rv)./(data1.σrv.+σj^2)).^2)
+    rv_model2 = model_1pl.(data2.t,P1,K1,e1,ω1,M1,C2, slope=slope, t_mean=t_mean)
+    loss += 0.5*sum((rv_model2.-data2.rv).^2 ./(data2.σrv.^2 .+σj^2))
+    loss += 0.5*sum(log.(2π*(data1.σrv.^2 .+σj^2)))
+    loss += 0.5*sum(log.(2π*(data2.σrv.^2 .+σj^2)))
+    return loss
 end
 
-# ╔═╡ b8ec7c40-5075-4cd9-89dd-b649e53d8558
-P0=LombScargle.findmaxperiod(pgram)
+  ╠═╡ =#
 
+# ╔═╡ 1d397e31-740e-41e7-ab4c-d6009752ee33
+""" Convert vector of (P,K,h,k,M0-ω) to vector of (P, K, e, ω, M0) """
+function PKhkωMmω_to_PKeωM(x::Vector)
+	(P, K, h, k, ωmM) = x
+	e = sqrt(h^2+k^2)
+	ω = atan(h,k)
+	return [P, K, e, ω, ωmM+ω]
+end
 
-# ╔═╡ 17b1760d-ed77-4773-8147-43245c70a962
+# ╔═╡ 71e66a2a-be4d-48f3-a868-bcd8f7647e22
+function make_loss_1pl(data1,data2; t_mean=0)
+	function loss_1pl(θ)
+		(P1, K1, h1, k1, Mpω1, C, σj ) = θ
+		( P1, K1, e1, ω1, M1 ) = PKhkωMmω_to_PKeωM([P1, K1, h1, k1, Mpω1])
+		if e1>1 return 1e6*e1 end
+		rv_model1 = model_1pl.(data1.t,P1,K1,e1,ω1,M1,C, t_mean=t_mean)
+		loss = 0.5*sum( (rv_model1.-data1.rv).^2 ./ (data1.σrv.^2 .+ σj^2) )
+		rv_model2 = model_1pl.(data2.t,P1,K1,e1,ω1,M1,C, t_mean=t_mean)
+		loss += 0.5*sum( (rv_model2.-data2.rv).^2 ./ (data2.σrv.^2 .+ σj^2) )
+		loss += 0.5*sum(log.(2π*(data1.σrv.^2 .+σj^2)))
+		loss += 0.5*sum(log.(2π*(data2.σrv.^2 .+σj^2)))
+		return loss
+	end
+	#function loss_1pl(θ) 
+    #(P1, K1, h1, k1, Mpω1, C1, C2, slope, σj ) = θ
+    #( P1, K1, e1, ω1, M1 ) = PKhkωpM_to_PKeωM([P1, K1, h1, k1, Mpω1])
+    #if e1>1 return 1e6*e1 end
+    #rv_model1 = model_1pl.(data1.t,P1,K1,e1,ω1,M1,C1, slope=slope, t_mean=t_mean)
+    #loss = 0.5*sum(((rv_model1.-data1.rv)./(data1.σrv.+σj^2)).^2)
+    #rv_model2 = model_1pl.(data2.t,P1,K1,e1,ω1,M1,C2, slope=slope, t_mean=t_mean)
+    #loss += 0.5*sum((rv_model2.-data2.rv).^2 ./(data2.σrv.^2 .+σj^2))
+    #loss += 0.5*sum(log.(2π*(data1.σrv.^2 .+σj^2)))
+    #loss += 0.5*sum(log.(2π*(data2.σrv.^2 .+σj^2)))
+    #return loss
+#end
+
+end
+
+# ╔═╡ 514730e4-f589-4841-a4db-4b39e746e6a9
+function find_best_1pl_fit(θinit::AbstractVector, loss::Function; num_init_phases::Integer=1, num_init_ωs::Integer=1, f_abstol::Real = 1e-2 )
+	@assert 1 <= num_init_phases <= 32
+	@assert 1 <= num_init_ωs <= 8
+	result_list = Array{Any}(undef,num_init_phases, num_init_ωs)
+	θinit_list = fill(θinit,num_init_phases, num_init_ωs)
+	e_base = sqrt(θinit[3]^2+θinit[4]^2)
+	ω_base = atan(θinit[3],θinit[4])
+	for i in 1:num_init_phases
+		for j in 1:num_init_ωs
+		Δω = (j-1)/num_init_ωs * 2π
+		θinit_list[i,j][3] = e_base*sin(ω_base + Δω)
+		θinit_list[i,j][4] = e_base*cos(ω_base + Δω)
+		θinit_list[i,j][5] += (i-1)/num_init_phases * 2π - Δω
+		θinit_list[i,j][5] = mod(θinit_list[i,j][5],2π)
+		try
+			result_list[i,j] = Optim.optimize(loss, θinit_list[i,j], BFGS(), autodiff=:forward, Optim.Options(f_abstol=f_abstol));
+		catch
+			result_list[i,j] = (;minimum=Inf)
+		end
+		end
+	end
+	best_result_id = argmin(map(r->r.minimum, result_list))
+	result = result_list[best_result_id]
+end
+
+# ╔═╡ 34fa0f41-fae2-4854-8055-d9ee476c3eef
+	result = find_best_1pl_fit(init_guess, make_loss_1pl(data1,data2, t_mean=t_mean), num_init_phases = 1, num_init_ωs=4)
+
+# ╔═╡ d9568f71-edcb-45a7-80d7-0bd788d1f32c
+result.minimizer[1:5]
+
+# ╔═╡ 34304691-cdd8-4cc0-a33e-e166c434eb4d
 begin
-	plt_phase_all = plot(widen=false)
-	num_inst = size(df_star_by_inst,1)
+	plt_phase_all_after = plot(widen=false)
 	for inst in 1:num_inst
 		if length(df_star_by_inst[inst,:rv]) == 0 continue end
 		rvoffset = mean(df_star_by_inst[inst,:rv]) .- 30 .* (inst-2)
-		phase = mod.((df_star_by_inst[inst,:bjd].-t_offset)./P0,1.0)
-		scatter!(plt_phase_all,phase,
+		phase = mod.((df_star_by_inst[inst,:bjd].-t_offset)./result.minimizer[1],1.0)
+		scatter!(plt_phase_all_after,phase,
 				df_star_by_inst[inst,:rv].-rvoffset,
 				yerr=collect(df_star_by_inst[inst,:σrv]),
 				markersize=2, markerstrokewidth=0.5,
 				label=instrument_label[df_star_by_inst[inst,:inst]])
 	end
 	#plot!(plt,t_plt,pred_1pl, label=:none)
-	xlabel!(plt_phase_all,"Phase")
-	ylabel!(plt_phase_all,"RV (m/s)")
-	title!(plt_phase_all,"HD " * star_name )
-	plt_phase_all
+	xlabel!(plt_phase_all_after,"Phase")
+	ylabel!(plt_phase_all_after,"RV (m/s)")
+	title!(plt_phase_all_after,"HD " * star_name )
+	plt_phase_all_after
 end
 
-# ╔═╡ d63c6ac8-3623-426e-b25f-668ffce47ddd
-let
-	expected_distribution = Chisq(nobs)
-	est_max_y = maximum(pdf.(expected_distribution,range(nobs/2,stop=1.5*nobs,length=100)))
-
-	plt = plot(expected_distribution, xlabel="loss", ylabel="Probability", legend=:none)
-	plot!(plt,[loss_at_mle,loss_at_mle],[0,est_max_y], linestyle=:dot, linecolor=:black)
-end
-
-# ╔═╡ acff1e9d-038c-4267-9f85-37e21122988c
-if size(df_star_by_inst,1)>0  # Warning: Picks RVs from only 1 instrument
-	data = ( t=collect(df_star_by_inst[inst_idx,:bjd]).-t_offset,
-			rv=collect(df_star_by_inst[inst_idx,:rv]),
-			σrv=collect(df_star_by_inst[inst_idx,:σrv]) )
-	t_mean = mean(data.t)
-	t_plt = range(minimum(data.t), stop=maximum(data.t), step=1.0)
-	phase_plt = range(0.0, stop=1, length=100)
-else
-	data = (t=Float64[], rv=Float64[], σrv=Float64[])
-end;
-
-# ╔═╡ f4beec25-3ff9-4d63-af0b-4feea12916f8
-@model rv_kepler_model_v1(t, rv_obs, σ_obs) = begin
-    # Specify Priors
-	P_max = 1000
-	K_max = 1000
-	σj_max = 100
-    P ~ ModifiedJeffreysPriorForScale(1.0, P_max)        # orbital period
-    K ~ ModifiedJeffreysPriorForScale(1.0, K_max)        # RV amplitude
-    e ~ Truncated(Rayleigh(0.3),0.0,0.999);              # orbital eccentricity
-    ω ~ Uniform(0, 2π)           # arguement of pericenter
-	h ~ Normal(0,0.3)
-	k ~ Normal(0,0.3)
-    M0_minus_ω ~ Uniform(0,2π)   # mean anomaly at t=0 minus ω
-    C ~ Normal(0,1000.0)         # velocity offset
-    σ_j ~ ModifiedJeffreysPriorForScale(1.0, σj_max)      # magnitude of RV jitter
-	#σ_j ~ LogNormal(log(1.0), 0.5)      # magnitude of RV jitter
-
-    # Transformations to make sampling more efficient
-	e = sqrt(h^2+k^2)
-	ω = atan(h,k)
-    M0 = M0_minus_ω + ω
-
-    # Reject any parameter values that are unphysical, _before_ trying
-    # to calculate the likelihood to avoid errors/assertions
-    if !(0.0 <= e < 1.0)
-        Turing.@addlogprob! -Inf
-        return
-    end
-	
-    # Likelihood
-    # Calculate the true velocity given model parameters
-    rv_true = calc_rv_keplerian_plus_const.(t, P,K,e,ω,M0,C)
-
-    # Specify measurement model
-    σ_eff = sqrt.(σ_obs.^2 .+ σ_j.^2)
-    rv_obs ~ MvNormal(rv_true, σ_eff )
-end
-
-# ╔═╡ 5bc69661-432b-442d-bd07-02fa78c49421
-model_given_data = rv_kepler_model_v1(data.t, data.rv, data.σrv);
-
-# ╔═╡ b6753753-48c6-4fc3-92a5-061fd2f8d37f
+# ╔═╡ 7d7fba67-c78a-44fe-bd9b-d8d4967b32c7
 begin
-	P_guess = P0[1]
-	h_guess = 0.5
-	k_guess = -0.5
-	K_guess = 5
-	C_guess = mean(data.rv)
-	σj_guess = 1
-	e_guess=0.5
-	ω_guess=π
-	M0_minus_ω_guess=0.0001
-	init_guess=[P_guess,K_guess,e_guess,ω_guess,h_guess,k_guess,M0_minus_ω_guess,C_guess,σj_guess]
+	num_bootstrap_samples=100
+results_bootstrap = Array{Any}(undef,num_bootstrap_samples)
+	rms_bootstrap = zeros(num_bootstrap_samples)
+	rms_bootstrap_train = zeros(num_bootstrap_samples)
+	testset_length = zeros(num_bootstrap_samples)
+	for i in 1:num_bootstrap_samples
+		# Select sample of points to fit
+		idx1 = sample(1:length(data1.t),length(data1.t))
+		idx2 = sample(1:length(data2.t),length(data2.t))
+		# Create NamedTuple with view of resampled data
+		data_tmp1 = (;t=view(data1.t,idx1), rv=view(data1.rv,idx1), σrv=view(data1.σrv,idx1))
+		data_tmp2 = (;t=view(data2.t,idx2), rv=view(data2.rv,idx2), σrv=view(data2.σrv,idx2))
+		
 
-	map_estimate = optimize(model_given_data, MAP(), init_guess,  Optim.Options(f_tol=1e-5) )
-end;
+		loss_tmp = make_loss_1pl(data_tmp1,data_tmp2, t_mean=t_mean)
+		# Attempt to find best-fit parameters results for resampled data
+		results_bootstrap[i] = find_best_1pl_fit(init_guess, loss_tmp, num_init_phases=1, num_init_ωs=4)
+		# Evaluate residuals for cross validation
+		
+	end
+	results_bootstrap
+end
 
-# ╔═╡ e85b56e7-8ddf-4d34-9cd1-b0594c2e11c0
-map_estimate
+# ╔═╡ 79e5a375-3c16-4443-86b9-d3bbad6101d4
+if @isdefined results_bootstrap
+	plt_title = plot(title = "Bootstrap Results", grid = false, showaxis = false, ticks=:none, bottom_margin = -25Plots.px)
 
-# ╔═╡ a494b98a-08df-464c-b3f4-584463f4210c
-md"""
-# Robustness
-"""
+	local Psample = map(r->r.minimizer[1],results_bootstrap)
+	P_mean_bootstrap = mean(Psample)
+	P_std_bootstrap = std(Psample)
+	plt_P_hist = plot(xlabel="P (d)",ylabel="Samples",xticks=
+	optimize_ticks(minimum(Psample),maximum(Psample),k_max=3)[1])
+	histogram!(plt_P_hist,Psample, label=:none, nbins=50)
 
-# ╔═╡ 769de9c4-6167-4550-be08-320c7c63fe3e
-md"""
-# Set Up
-"""
+	local Ksample = map(r->r.minimizer[2],results_bootstrap)
+	K_mean_bootstrap = mean(Ksample)
+	K_std_bootstrap = std(Ksample)
+	plt_K_hist = plot(xlabel="K (m/s)", ylabel="Samples",xticks=
+	optimize_ticks(minimum(Ksample),maximum(Ksample),k_max=3)[1])
+	histogram!(plt_K_hist,Ksample, label=:none, nbins=50)
+
+	local esample = map(r->PKhkωMmω_to_PKeωM(r.minimizer)[3],results_bootstrap)
+	e_mean_bootstrap = mean(esample)
+	e_std_bootstrap = std(esample)
+	plt_e_hist = plot(xlabel="e", ylabel="Samples",xticks=
+	optimize_ticks(minimum(esample),maximum(esample),k_max=3)[1])
+	histogram!(plt_e_hist,esample, label=:none, nbins=50)
+
+	local ωsample = map(r->PKhkωMmω_to_PKeωM(r.minimizer)[4],results_bootstrap)
+	ω_mean_bootstrap = mean(ωsample)
+	ω_std_bootstrap = std(ωsample)
+	plt_ω_hist = plot(xlabel="ω", ylabel="Samples",xticks=
+	optimize_ticks(minimum(ωsample),maximum(ωsample),k_max=3)[1])
+	histogram!(plt_ω_hist,ωsample, label=:none, nbins=50)
+
+	h_mean_bootstrap = mean(esample.*sin.(ωsample))
+	h_std_bootstrap = std(esample.*sin.(ωsample))
+	k_mean_bootstrap = mean(esample.*cos.(ωsample))
+	k_std_bootstrap = std(esample.*cos.(ωsample))
+
+	local Mmωsample = map(r->PKhkωMmω_to_PKeωM(r.minimizer)[5],results_bootstrap)
+	Mmω_mean_bootstrap = mean(Mmωsample)
+	Mmω_std_bootstrap = std(Mmωsample)
+	plt_Mmω_hist = plot(xlabel="M₀-ω", ylabel="Samples",xticks=
+	optimize_ticks(minimum(Mmωsample),maximum(Mmωsample),k_max=3)[1])
+	histogram!(plt_Mmω_hist,ωsample, label=:none, nbins=50)
+
+	local Csample = map(r->r.minimizer[6],results_bootstrap)
+	C_mean_bootstrap = mean(Csample)
+	C_std_bootstrap = std(Csample)
+	plt_C_hist = plot(xlabel="C", ylabel="Samples",xticks=
+	optimize_ticks(minimum(Csample),maximum(Csample),k_max=2)[1])
+	histogram!(plt_C_hist,Csample, label=:none, nbins=50)
+
+	local σjsample = map(r->r.minimizer[7],results_bootstrap)
+	σj_mean_bootstrap = mean(σjsample)
+	σj_std_bootstrap = std(σjsample)
+	plt_σj_hist = plot(xlabel="σⱼ", ylabel="Samples",xticks=
+	optimize_ticks(minimum(σjsample),maximum(σjsample),k_max=3)[1])
+	histogram!(plt_σj_hist,σjsample, label=:none, nbins=50)
+
+	bootstrap_results_df = DataFrame(:parameter=>[:P, :K, :h, :k, :e, :ω, :Mmω, :C, :σj], :mean=>[P_mean_bootstrap, K_mean_bootstrap, h_mean_bootstrap, k_mean_bootstrap, e_mean_bootstrap, ω_mean_bootstrap, Mmω_mean_bootstrap, C_mean_bootstrap, σj_mean_bootstrap], :std=>[P_std_bootstrap,K_std_bootstrap,h_std_bootstrap,k_std_bootstrap,e_std_bootstrap,ω_std_bootstrap,Mmω_std_bootstrap,C_std_bootstrap,σj_std_bootstrap])
+	
+	plot(plt_title, plt_P_hist, plt_K_hist, plt_e_hist, plt_ω_hist, plt_C_hist, plt_σj_hist, layout=@layout([A{0.01h}; [B C; D E; F G ]]), size=(600,600) )
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2375,14 +2556,14 @@ version = "1.4.1+0"
 
 # ╔═╡ Cell order:
 # ╟─f53f1d9f-8be8-4dcc-a637-f39b1eaacd63
-# ╠═8cf8e22c-af0f-422b-89a1-109291cd749a
+# ╟─8cf8e22c-af0f-422b-89a1-109291cd749a
 # ╟─6d090107-d691-4a68-91ad-c7dae5df35ad
 # ╟─8f829f16-553a-11ed-3fd9-9f77ddd265d5
-# ╠═a6eedc20-0171-48c7-938f-daee0ce4f8e9
+# ╟─a6eedc20-0171-48c7-938f-daee0ce4f8e9
 # ╠═6162976e-34ff-498a-ac7c-3dafd80fb4a4
-# ╠═e71bdd5e-a50e-46b2-8249-55ad7dffb789
+# ╟─e71bdd5e-a50e-46b2-8249-55ad7dffb789
 # ╟─08f0978c-a04c-452a-87e6-ca6df2fb5893
-# ╠═87ad2397-39a1-4d1e-b8c2-883639d99015
+# ╟─87ad2397-39a1-4d1e-b8c2-883639d99015
 # ╠═519b083c-aa8d-48da-b9ec-6e3cddf94d99
 # ╠═f3bbb76c-14cd-4566-935b-5c1f6949eaf5
 # ╟─4a949edb-8737-4439-a1c0-14641bd99f8c
@@ -2398,38 +2579,50 @@ version = "1.4.1+0"
 # ╠═3f20587c-8843-495e-a77f-c918e48f86e2
 # ╟─e53d6766-4fb1-4bda-822e-9e468b440fdf
 # ╟─3bc0583f-bfa6-49ce-9352-f5b504279ce3
+# ╠═25879a59-5aaa-40de-a289-998cda21448d
 # ╠═1121402e-69d9-4d3b-bec9-c4011e226675
 # ╟─ec77269a-6cf8-420f-a7ef-75f15e30de28
 # ╠═b8ec7c40-5075-4cd9-89dd-b649e53d8558
 # ╟─68a49dcb-3cd9-4905-abf6-d43083d256ce
 # ╠═59069f4e-58fa-458a-8c47-4176e3970f43
 # ╠═17b1760d-ed77-4773-8147-43245c70a962
+# ╠═a435c976-de91-40a6-b536-9cf005027a3b
+# ╠═163fd9dc-daed-489c-bd23-ff2ae816c69d
 # ╟─0b49db68-973a-42e0-8eed-4f4405b5f808
-# ╠═5a929ea7-93cc-4c4d-9340-734bcd509719
-# ╠═deb25ff2-c774-48e4-8ef7-9afcbf86f3d9
-# ╠═433c228f-4168-44dd-8d44-8b2c5c579e89
+# ╟─5a929ea7-93cc-4c4d-9340-734bcd509719
+# ╟─deb25ff2-c774-48e4-8ef7-9afcbf86f3d9
+# ╟─433c228f-4168-44dd-8d44-8b2c5c579e89
 # ╟─294a349b-02d0-461e-8a78-ab3b87b510ed
 # ╠═640c9851-73ba-47ed-84e4-6484f3b793b2
 # ╟─c806b3eb-9c0b-4a96-b21a-03cb17c4bc2c
 # ╠═159b2a95-26d1-4017-9f3c-db8467ef7623
 # ╠═36e7d4ab-735e-4517-bf2e-ae1db69d227e
-# ╠═d63c6ac8-3623-426e-b25f-668ffce47ddd
+# ╟─d63c6ac8-3623-426e-b25f-668ffce47ddd
 # ╟─3b21b28a-52f0-4da0-beba-bb09d666b9c6
-# ╠═acff1e9d-038c-4267-9f85-37e21122988c
-# ╠═5bc69661-432b-442d-bd07-02fa78c49421
+# ╟─acff1e9d-038c-4267-9f85-37e21122988c
+# ╠═f46cbed8-dec6-4bb2-8942-4fe96ebea3e4
+# ╠═3862a20f-672e-4d61-aba8-41565b2a79ae
+# ╠═f71d567d-d026-4859-b74d-87bc278b01be
 # ╠═b6753753-48c6-4fc3-92a5-061fd2f8d37f
-# ╠═e85b56e7-8ddf-4d34-9cd1-b0594c2e11c0
-# ╠═cc68ee1c-f252-4f12-90e5-9caa7a4e519d
-# ╠═f4beec25-3ff9-4d63-af0b-4feea12916f8
-# ╠═2e7eb972-1a23-4c2e-9eb8-2c1671b8de56
-# ╠═a1541fe7-023b-43dc-95d2-fae2d6bd3fc5
-# ╠═0a4b48c3-79bb-4f32-a3ce-75121fc35151
-# ╠═f8488b03-79cc-492a-8e1a-a922168f45d2
-# ╠═6aa94932-4e03-4eb5-981b-03e98bc7d759
-# ╠═728d106f-fddc-4b79-908a-1b3be0ec0e89
-# ╟─746bb4e7-83ee-4e3d-a152-85424f3efb56
-# ╠═a494b98a-08df-464c-b3f4-584463f4210c
+# ╠═34fa0f41-fae2-4854-8055-d9ee476c3eef
+# ╠═d9568f71-edcb-45a7-80d7-0bd788d1f32c
+# ╠═ba55bc10-fb52-4135-8e9e-b3977a7369f2
+# ╠═ee34c025-55c9-4136-b8c8-6ddaa678431a
+# ╠═34304691-cdd8-4cc0-a33e-e166c434eb4d
+# ╟─a494b98a-08df-464c-b3f4-584463f4210c
+# ╠═7d7fba67-c78a-44fe-bd9b-d8d4967b32c7
+# ╠═79e5a375-3c16-4443-86b9-d3bbad6101d4
 # ╟─769de9c4-6167-4550-be08-320c7c63fe3e
 # ╠═7c2ceba1-6e8a-4a5f-845d-73b97810c099
+# ╟─74170a94-2014-45fd-9f1d-d476b1febf14
+# ╟─0f2ee09b-1d31-4a34-9b0a-22e8b91f4303
+# ╟─6cea0d3e-daed-4318-83b0-13bf9fe00d2a
+# ╟─5dcd30d7-dd60-4b15-96a6-4b222e55d779
+# ╟─c67d1588-36e4-44aa-a98b-8308bf57e1e0
+# ╟─d892f267-8a1f-41e8-9104-573ec424abc9
+# ╠═71e66a2a-be4d-48f3-a868-bcd8f7647e22
+# ╟─61379c75-6969-4652-b6ce-7e1e992f1f23
+# ╟─1d397e31-740e-41e7-ab4c-d6009752ee33
+# ╟─514730e4-f589-4841-a4db-4b39e746e6a9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
