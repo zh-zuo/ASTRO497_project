@@ -40,8 +40,8 @@ TableOfContents()
 
 # ╔═╡ 6d090107-d691-4a68-91ad-c7dae5df35ad
 md"""
-### Overview 
-Our project aims to construct a dashboard that ingests radial velocity observation data and analyzes orbit parameters and planet mass. In our dashboard, we
+# Overview 
+Our project aims to construct a dashboard that ingests radial velocity observation data and analyzes orbit parameters. In our dashboard, we
 will utilize The California Legacy Survey (Rosenthal et al., 2021) data.
 """
 
@@ -75,8 +75,8 @@ begin
 
 end
 
-# ╔═╡ 6162976e-34ff-498a-ac7c-3dafd80fb4a4
-df_all
+# ╔═╡ bfc1affc-b392-4884-a35f-55593af7db53
+t_offset = 2455000; 
 
 # ╔═╡ e71bdd5e-a50e-46b2-8249-55ad7dffb789
 begin
@@ -84,18 +84,10 @@ begin
 	select_star_url = "#$(select_star_id)"
 	
 md"""
-Please select a star to be analyzed: $(@bind selected_star Select(collect(values(star_names)); default="10002"))
+Please select a star to be analyzed: $(@bind selected_star Select(collect(values(star_names)); default="117176"))
 """
 
 end
-
-# ╔═╡ 08f0978c-a04c-452a-87e6-ca6df2fb5893
-md"""
-The name of the star we select to analyze is:
-"""
-
-# ╔═╡ 87ad2397-39a1-4d1e-b8c2-883639d99015
-selected_star
 
 # ╔═╡ 519b083c-aa8d-48da-b9ec-6e3cddf94d99
 starid = searchsortedfirst(star_names,selected_star);
@@ -105,11 +97,6 @@ begin
 	star_name = star_names[starid]
 	df_star = df_all |> @filter( _.Name == star_name ) |> DataFrame
 end;
-
-# ╔═╡ 4a949edb-8737-4439-a1c0-14641bd99f8c
-md"""
-Group data according to which instrument made the observation, so we can analyze each dataset separately.
-"""
 
 # ╔═╡ 2350b4a6-a538-430e-b832-4ecb4a458c4d
 begin
@@ -123,9 +110,6 @@ begin
 	catch
 	end
 end;
-
-# ╔═╡ d7bf3366-0283-43a7-b440-ce9abb677d0f
-df_star_by_inst
 
 # ╔═╡ 2de85bb1-881f-483a-bcdb-2109ed795ec5
  begin  # Make more useful observatory/instrument labels
@@ -143,8 +127,10 @@ df_star_by_inst
 	instrument_label
 end;
 
-# ╔═╡ bfc1affc-b392-4884-a35f-55593af7db53
-t_offset = 2455000; 
+# ╔═╡ 4a949edb-8737-4439-a1c0-14641bd99f8c
+md"""
+All available RV data for the selected star are plotted below.
+"""
 
 # ╔═╡ 6f000c6d-14a8-4d6d-97f8-d01f4dd516bc
 begin
@@ -164,30 +150,124 @@ begin
 	plt_rv_all_inst
 end
 
+# ╔═╡ e4084b5c-19de-460d-aceb-ee6f3cfafbd9
+md"""
+Number of data points for each instrument is listed below. You can select the dataset to be analyzed based on this information.
+"""
+
 # ╔═╡ e3b46289-f602-4dee-81cc-91c8466dcd5a
 df_star_by_inst |> @map( {:inst=>instrument_label[_.inst], :num_obs=>_.nobs_inst}) |> DataFrame
+
+# ╔═╡ 8f239f05-2610-42ce-92c6-968943418328
+begin
+	inst_list=[]
+
+	for i in values(instrument_label)
+		push!(inst_list,i)
+	end
+end
+
+# ╔═╡ 64987161-afde-4b4d-93a8-19f7b40aeae7
+md"""
+The dashboard can handle data from one instrument or two instruments. The default option is to use two instruments. You can click the checkbox if you want to fit the models with data from only one instrument.\
+Fit with only one instrument:$(@bind fit_with_one CheckBox())
+"""
 
 # ╔═╡ 383d9191-fc82-4f9c-81f5-837a67c71e9b
 begin
 	select_obs_cell_id = PlutoRunner.currently_running_cell_id[] |> string
 	select_obs_cell_url = "#$(select_obs_cell_id)"
 	md"""
-Select which instrument's data to analyze below: $(@bind inst_to_plt Select(collect(values(instrument_label)); default="Keck (post)"))
+Select first instrument's data to analyze: $(@bind inst1 Select(collect(values(instrument_label)); default=inst_list[1]))
 """
 end
 
-# ╔═╡ 1405994c-2340-4a1d-80c6-0a62e0ed72c8
-inst_idx = findfirst(isequal(inst_to_plt),map(k->instrument_label[k], df_star_by_inst[:,:inst]));
+# ╔═╡ 10290d00-c667-46f3-a03e-8fb33842448a
+if size(df_star_by_inst,1)>1 && ~fit_with_one 
+	md"""
+Select second instrument's data to analyze: $(@bind inst2 Select(collect(values(instrument_label)); default=inst_list[2]))
+"""
+end
+
+# ╔═╡ 32a6f1f8-c213-40c1-a6c1-5dc7ce87976e
+begin
+	inst_idx1 = findfirst(isequal(inst1),map(k->instrument_label[k], df_star_by_inst[:,:inst]));
+	if @isdefined inst2 
+		inst_idx2 = findfirst(isequal(inst2),map(k->instrument_label[k], df_star_by_inst[:,:inst]));
+	end
+	nothing
+end
 
 # ╔═╡ 66446e92-0d84-4d2b-9804-a563fbd8e30b
 begin
-	plt_1inst = plot(xlabel="Time (d)", ylabel="RV (m/s)", title="Zoom in on RVs from instrument being fit")
-	scatter!(plt_1inst, df_star_by_inst[inst_idx,:bjd].-t_offset,df_star_by_inst[inst_idx,:rv],yerr=df_star_by_inst[inst_idx,:σrv], label=instrument_label[df_star_by_inst[inst_idx,:inst]], markercolor=inst_idx)
+	plt_1inst = plot(xlabel="Time (d)", ylabel="RV (m/s)", title="RVs from instrument being fit")
+	scatter!(plt_1inst, df_star_by_inst[inst_idx1,:bjd].-t_offset,df_star_by_inst[inst_idx1,:rv],yerr=df_star_by_inst[inst_idx1,:σrv], label=instrument_label[df_star_by_inst[inst_idx1 ,:inst]], markercolor=inst_idx1)
+	if @isdefined inst_idx2
+		scatter!(plt_1inst, df_star_by_inst[inst_idx2,:bjd].-t_offset,df_star_by_inst[inst_idx2,:rv],yerr=df_star_by_inst[inst_idx2,:σrv], label=instrument_label[df_star_by_inst[inst_idx2 ,:inst]], markercolor=inst_idx2)
+	end
 end
 
-# ╔═╡ 3f20587c-8843-495e-a77f-c918e48f86e2
+# ╔═╡ a435c976-de91-40a6-b536-9cf005027a3b
+if size(df_star_by_inst,1)>0  # Warning: Assume exactly 2 instruments providing RV data
+    data1 = (t=collect(df_star_by_inst[inst_idx1,:bjd]).-t_offset, rv=collect(df_star_by_inst[inst_idx1,:rv]), σrv=collect(df_star_by_inst[inst_idx1,:σrv]))
+    if @isdefined inst_idx2
+        data2 = (t=collect(df_star_by_inst[inst_idx2,:bjd]).-t_offset, rv=collect(df_star_by_inst[inst_idx2,:rv]), σrv=collect(df_star_by_inst[inst_idx2,:σrv]))
+    else
+        data2 = (t=Float64[], rv=Float64[], σrv=Float64[])
+    end
+    t_mean = (sum(data1.t)+sum(data2.t))/(length(data1.t).+length(data2.t))
+    t_plt = range(minimum(vcat(data1.t,data2.t)), stop=maximum(vcat(data1.t,data2.t)), step=1.0)
+end;
+
+# ╔═╡ 0b49db68-973a-42e0-8eed-4f4405b5f808
+md"""
+# Fitting a linear model
+"""
+
+# ╔═╡ 5a929ea7-93cc-4c4d-9340-734bcd509719
+md"""
+A star without any planet is expected to have linear radial velocity. We fit a linear model to our data and see if it is a good fit. Sometimes, if the data seems to be linear, it is a good idea to subract linear part to see the deviations.
+"""
+
+# ╔═╡ 2b35c01d-1bd1-4cdd-a9e6-5f61652bf36e
+md"""
+Residuals to the linear model are plotted below:
+"""
+
+# ╔═╡ d24fbe45-dc19-4946-9958-b3f26650d572
+init_li=[0,mean(data1.rv),mean(data2.rv)];
+
+# ╔═╡ 7e9f805c-80c4-472f-a3ea-f73a732b8a57
+md"""
+The loss function value with best fit parameters is:
+"""
+
+# ╔═╡ bb799c04-0e8c-4f02-a831-0acaa36d20c7
+md"""
+Number of observations:
+"""
+
+# ╔═╡ 62e93800-22bd-40a1-9ee6-bcd1134539ae
+md"""
+The expected distribution of loss and the loss value at mle are plotted in the following figure.
+"""
+
+# ╔═╡ 09020d68-05d3-4908-9dcc-c1e0097cd54c
+md"""
+If you want to subtract linear fitting results from the data, click the checkbox: $(@bind subtract_linear CheckBox()). \
+Warning: Only do this if the data looks to be linear and you want to investigate small deviations around the linear relationship. It is generally not suggested to subtract the linear fitting results.
+"""
+
+# ╔═╡ 963230d5-cef8-4a9c-aef4-319cbd75c207
+if subtract_linear
 begin
-	df_star_selected=filter(row->row.Inst==Dict(value => key for (key, value) in instrument_label)[inst_to_plt], df_star)
+	plt_linear_subtracted = plot(xlabel="Time (d)", ylabel="RV (m/s)", title="RV data with linear results subtracted")
+	scatter!(plt_linear_subtracted, data1.t,data1.rv,yerr=data1.σrv, label=instrument_label[df_star_by_inst[inst_idx1 ,:inst]], markercolor=inst_idx1)
+	if @isdefined inst_idx2
+		scatter!(plt_linear_subtracted, data2.t,data2.rv,yerr=data2.σrv, label=instrument_label[df_star_by_inst[inst_idx2 ,:inst]], markercolor=inst_idx2)
+	end
+	plt_linear_subtracted
+end
 end
 
 # ╔═╡ e53d6766-4fb1-4bda-822e-9e468b440fdf
@@ -201,37 +281,10 @@ Ground-based astronomical observations are very rarely evenly spaced.
 The corresponding method for unevenly sampled data would be the Lomb-Scargle periodogram or some generalizations(e.g., the maximum log likelihood as a function of orbital period or the marginal log a posteriori probability as a function of orbital period).
 """
 
-# ╔═╡ 25879a59-5aaa-40de-a289-998cda21448d
+# ╔═╡ 1ce61116-86e3-4488-b2ec-a0d7617bb4b3
 md"""
-Choose one dataset to plot lomb-Scargle
+Generate Periodogram with period upto $(@bind periodogram_range NumberField(0:1:500, default=200))% of observation period. 
 """
-
-# ╔═╡ ec77269a-6cf8-420f-a7ef-75f15e30de28
-md"""
-Period with maximum power:
-"""
-
-# ╔═╡ 68a49dcb-3cd9-4905-abf6-d43083d256ce
-md"""
-(Side note for self-reference) HD 111031, long period planet, the observation duration does not cover a whole period, periodiagram is not useful.
-"""
-
-# ╔═╡ 59069f4e-58fa-458a-8c47-4176e3970f43
-md"""
-Radio velocity with respect to phase. The RV value for diffrerent instruments are randomly separted.
-"""
-
-# ╔═╡ a435c976-de91-40a6-b536-9cf005027a3b
-if size(df_star_by_inst,1)>0  # Warning: Assume exactly 2 instruments providing RV data
-    data1 = (t=collect(df_star_by_inst[1,:bjd]).-t_offset, rv=collect(df_star_by_inst[1,:rv]), σrv=collect(df_star_by_inst[1,:σrv]))
-    if size(df_star_by_inst,1) > 1
-        data2 = (t=collect(df_star_by_inst[2,:bjd]).-t_offset, rv=collect(df_star_by_inst[2,:rv]), σrv=collect(df_star_by_inst[2,:σrv]))
-    else
-        data2 = (t=Float64[], rv=Float64[], σrv=Float64[])
-    end
-    t_mean = (sum(data1.t)+sum(data2.t))/(length(data1.t).+length(data2.t))
-    t_plt = range(minimum(vcat(data1.t,data2.t)), stop=maximum(vcat(data1.t,data2.t)), step=1.0)
-end;
 
 # ╔═╡ 1121402e-69d9-4d3b-bec9-c4011e226675
 begin
@@ -239,21 +292,42 @@ begin
 	#t=df_star[(df_star[:,:Inst].=="k").||(df_star[:,:Inst].=="j"),:d]
 	#s=df_star[:,:RVel]
 	#t=df_star[:,:d]
-	t=data2.t
-	s=data2.rv
+	t=data1.t
+	s=data1.rv
 	D=maximum(t)-minimum(t) #Duration of observations
-	plan = LombScargle.plan(t, s,minimum_frequency=1/D)
+	plan = LombScargle.plan(t, s,minimum_frequency=1/(D*periodogram_range/100))
 	pgram = lombscargle(plan)
-	plot(periodpower(pgram)...)
+	plot(periodpower(pgram)...,label="Periodogram")
 	fap=LombScargle.fapinv(pgram,0.0001)
 	fap2=LombScargle.fapinv(pgram,0.01)
-	hline!([fap fap])
-	hline!([fap2 fap2])
+	hline!([fap],label="FAP=0.0001")
+	hline!([fap2],label="FAP=0.01")
 end
+
+# ╔═╡ ec77269a-6cf8-420f-a7ef-75f15e30de28
+md"""
+Period with maximum power:
+"""
 
 # ╔═╡ b8ec7c40-5075-4cd9-89dd-b649e53d8558
 P0=LombScargle.findmaxperiod(pgram)
 
+
+# ╔═╡ b51622f7-baf7-4ab5-861e-dd7f5a707fdb
+if LombScargle.findmaxpower(pgram)<fap2
+	warning_box(md"There is no period with FAP<0.01. That is, there is no obvious periodic signal. Be cautious in the following analysis.")
+end
+
+# ╔═╡ 68a49dcb-3cd9-4905-abf6-d43083d256ce
+
+warning_box(md"
+periodiagram is not useful for planets with periods longer than the observation duration.
+")
+
+# ╔═╡ 59069f4e-58fa-458a-8c47-4176e3970f43
+md"""
+Radial velocity with respect to phase plot, using the period with maximum power provided by lomb-scargle periodogram. The RV value for diffrerent instruments are randomly separted.
+"""
 
 # ╔═╡ 17b1760d-ed77-4773-8147-43245c70a962
 begin
@@ -276,26 +350,82 @@ begin
 	plt_phase_all
 end
 
-# ╔═╡ 163fd9dc-daed-489c-bd23-ff2ae816c69d
-data1
-
-# ╔═╡ 0b49db68-973a-42e0-8eed-4f4405b5f808
+# ╔═╡ 3b21b28a-52f0-4da0-beba-bb09d666b9c6
 md"""
-# Fitting a linear model
+# Fitting one planet model
 """
 
-# ╔═╡ 5a929ea7-93cc-4c4d-9340-734bcd509719
+# ╔═╡ f46cbed8-dec6-4bb2-8942-4fe96ebea3e4
 md"""
-A star without any planet is expected to have linear radio velocity. We fit a linear model to our data and see if it is a good fit. 
+Set initial values. The initial guess for P is determined by the periodogram by default.\
+P: $(@bind P_guess NumberField(1:0.0001:100000, default=P0[1]))
+
+
+
+h: $(@bind h_guess NumberField(0:0.01:2π, default=0.01))
+k: $(@bind k_guess NumberField(0:0.01:2π, default=0.01))
+σj: $(@bind σj_guess NumberField(0:0.05:2π, default=3.0))
 """
 
-# ╔═╡ deb25ff2-c774-48e4-8ef7-9afcbf86f3d9
-function predict_linear_model(A::AbstractMatrix, b::AbstractVector)
-	@assert size(A,2) == length(b)
-	A*b
-end;
+# ╔═╡ 2384f27b-05d7-45f8-a18c-75bcdea14b80
+md"""
+The initial guesses are (P, K, h, k, M0-ω, C1, C2,σj):
+"""
 
-# ╔═╡ 433c228f-4168-44dd-8d44-8b2c5c579e89
+# ╔═╡ 6b5c4ec5-3b54-47e6-ad0b-d9a813b7bb7a
+md"""
+The results of model fitting are(P, K, h, k, M0-ω, C1, C2,σj):
+"""
+
+# ╔═╡ 69f83e46-8788-42ae-945d-3fb27b78a36f
+md"""
+RV data re-grouped by phasen is plotted below, using the period derived from the one planet keplerian model.
+"""
+
+# ╔═╡ 1d9f11ce-1515-4d75-9a30-55db3b3fa8ae
+md"""
+The constant-corrected RV observations used for the model fitting, together with the resulting model, are plotted below. 
+"""
+
+# ╔═╡ 8af96ff4-3c14-4667-9a31-d1aa22f927db
+md"""
+Residuals to the one planet model are plotted below.
+"""
+
+# ╔═╡ a494b98a-08df-464c-b3f4-584463f4210c
+md"""
+# Model Assessment
+"""
+
+# ╔═╡ d4eb252e-5d56-405d-9004-0cc0cbe05b98
+md"""
+Bootstrapping. Every time a sample does not converge, "Does not converge" will be printed in the following window.
+"""
+
+# ╔═╡ 173f7237-e446-4220-90ab-ab8d9cad8b64
+md"""
+Use bootstrap to estimate the distributions of orbit parameters.
+"""
+
+# ╔═╡ 7f720fc1-3004-41af-a570-46183ed4b646
+md"""
+The means and standard deviations of orbit parameters.
+"""
+
+# ╔═╡ 22ebdf59-a508-44f3-9db8-031b37c4446d
+md"""
+Consider the data points visited by bootstrap as training points, not visited ones as test points and perform cross-validation. Results are shown in the following figure.
+"""
+
+# ╔═╡ a40a805d-48a7-4451-b958-56ef041d3333
+warning_box(md"This fitting method does not perform well for orbits with extremely long periods (>10000days). Please be cautious.")
+
+# ╔═╡ 769de9c4-6167-4550-be08-320c7c63fe3e
+md"""
+# Set Up
+"""
+
+# ╔═╡ 9d1eadf9-7fe9-4620-b866-4a442033a0b4
 """
 `calc_mle_linear_model(A, y_obs, covar)`
 
@@ -309,104 +439,31 @@ function calc_mle_linear_model(A::AbstractMatrix, y_obs::AbstractVector, covar::
 	(A' * (covar \ A)) \ (A' * (covar \ y_obs) )
 end;
 
-# ╔═╡ 294a349b-02d0-461e-8a78-ab3b87b510ed
-md"""
-model: v=c1+c2*t. A: design matrix, b: bjd
-"""
-
 # ╔═╡ 640c9851-73ba-47ed-84e4-6484f3b793b2
 begin
+	nobs1 = size(data1.t)[1]
+	A1 = [ones(nobs1) data1.t-2455000*ones(nobs1)]
+	b1=data1.rv
+	covar1 = diagm(data1.σrv.^2)
+	θ_mle1 = calc_mle_linear_model(A1, b1, covar1)
+
 	nobs2 = size(data2.t)[1]
 	A2 = [ones(nobs2) data2.t-2455000*ones(nobs2)]
 	b2=data2.rv
 	covar2 = diagm(data2.σrv.^2)
 	θ_mle2 = calc_mle_linear_model(A2, b2, covar2)
+
+	nothing
 end
 
-# ╔═╡ c806b3eb-9c0b-4a96-b21a-03cb17c4bc2c
-md"""
-loss function
-"""
+# ╔═╡ 59bc7b62-87f8-42bb-80d0-74d4cf2c9edf
+nobs=nobs1+nobs2
 
-# ╔═╡ 159b2a95-26d1-4017-9f3c-db8467ef7623
-loss(A,θ) = sum( ((predict_linear_model(A,θ).-data2.rv)./data2.σrv).^2 )
-
-# ╔═╡ 36e7d4ab-735e-4517-bf2e-ae1db69d227e
-loss_at_mle2 = loss(A2,θ_mle2)
-
-# ╔═╡ d63c6ac8-3623-426e-b25f-668ffce47ddd
-let
-	expected_distribution = Chisq(nobs2)
-	est_max_y = maximum(pdf.(expected_distribution,range(nobs2/2,stop=1.5*nobs2,length=100)))
-
-	plt = plot(expected_distribution, xlabel="loss", ylabel="Probability", legend=:none)
-	plot!(plt,[loss_at_mle2,loss_at_mle2],[0,est_max_y], linestyle=:dot, linecolor=:black)
-end
-
-# ╔═╡ 3b21b28a-52f0-4da0-beba-bb09d666b9c6
-md"""
-# Fitting one planet model
-"""
-
-# ╔═╡ acff1e9d-038c-4267-9f85-37e21122988c
-# ╠═╡ skip_as_script = true
-#=╠═╡
-md"""
-if size(df_star_by_inst,1)>0  # Warning: Picks RVs from only 1 instrument
-	data = ( t=collect(df_star_by_inst[inst_idx,:bjd]).-t_offset,
-			rv=collect(df_star_by_inst[inst_idx,:rv]),
-			σrv=collect(df_star_by_inst[inst_idx,:σrv]) )
-	t_mean = mean(data.t)
-	t_plt = range(minimum(data.t), stop=maximum(data.t), step=1.0)
-	phase_plt = range(0.0, stop=1, length=100)
-else
-	data = (t=Float64[], rv=Float64[], σrv=Float64[])
+# ╔═╡ 5736df1b-a0c9-47b2-9cfe-faf01641ce26
+function predict_linear_model(A::AbstractMatrix, b::AbstractVector)
+	@assert size(A,2) == length(b)
+	A*b
 end;
-"""
-  ╠═╡ =#
-
-# ╔═╡ f46cbed8-dec6-4bb2-8942-4fe96ebea3e4
-#md"""
-#P: $(@bind P_guess NumberField(1:0.1:100, default=P0[1]))
-#K: $(@bind K_guess NumberField(0:0.1:20, default=5))
-#e: $(@bind e_guess NumberField(0:0.05:1, default=0.1))
-#ω: $(@bind ω_guess NumberField(0:0.05:2π, default=0))
-#h: $(@bind h_guess NumberField(0:0.05:2π, default=0))
-#k: $(@bind k_guess NumberField(0:0.05:2π, default=0))
-#M₀: $(@bind M0_plt NumberField(0:0.05:2π, default=0))
-#"""
-
-# ╔═╡ 3862a20f-672e-4d61-aba8-41565b2a79ae
-begin
-	P_guess = 4.230785  # for 51 Peg b
-	h_guess = 0.01
-	k_guess = 0.01
-	C_guess = mean(data1.rv)
-	σj_guess = 3.0
-end;
-
-# ╔═╡ f71d567d-d026-4859-b74d-87bc278b01be
-mean(data1.rv)
-
-# ╔═╡ b6753753-48c6-4fc3-92a5-061fd2f8d37f
-begin
-	
-	init_guess=[P0[1],54.0364,-0.01,0.01,4.79533,-1.5415,0.0001,3.0]
-	# P, K, h, k, C, ?, sigma
-	#[P_guess,K_guess,e_guess,ω_guess,h_guess,k_guess,M0_minus_ω_guess,C_guess,σj_guess]
-
-	#map_estimate = optimize(model_given_data, MAP(), init_guess,  Optim.Options(f_tol=1e-5,store_trace = true,show_trace = true) )
-end;
-
-# ╔═╡ a494b98a-08df-464c-b3f4-584463f4210c
-md"""
-# Model Assessment
-"""
-
-# ╔═╡ 769de9c4-6167-4550-be08-320c7c63fe3e
-md"""
-# Set Up
-"""
 
 # ╔═╡ 6cea0d3e-daed-4318-83b0-13bf9fe00d2a
 function calc_true_anom(ecc_anom::Real, e::Real)
@@ -505,13 +562,6 @@ begin
 	end
 end
 
-# ╔═╡ ee34c025-55c9-4136-b8c8-6ddaa678431a
-""" Calculate RV from t, P, K, e, ω, M0	and C with optional slope and t_mean"""
-function model_1pl(t, P, K, e, ω, M, C; slope=0.0, t_mean = 0.0)
-    calc_rv_keplerian(t-t_mean,P,K,e,ω,M) + C + slope * (t-t_mean)
-end
-
-
 # ╔═╡ 74170a94-2014-45fd-9f1d-d476b1febf14
 begin
 	""" Calculate RV from t, P, K, e, ω, M0	and C"""
@@ -523,6 +573,106 @@ begin
 	end
 end
 
+# ╔═╡ 2293d249-407a-4578-8eb8-377a3ef44e68
+function loss_li(θ)
+		(slope, C1,C2) = θ
+		
+		
+		rv_model1 = slope.*data1.t.+C1
+		loss =sum( (rv_model1.-data1.rv).^2 ./ data1.σrv.^2 )
+	if @isdefined inst_idx2	
+	rv_model2 = data2.t*slope.+C2
+		loss += sum( (rv_model2.-data2.rv).^2 ./ data2.σrv.^2  )
+	end
+		return loss
+	end
+
+# ╔═╡ 75e5df52-18ab-4046-a2a0-fdaea68d9543
+result_li=Optim.optimize(loss_li, init_li, BFGS(), autodiff=:forward);
+
+# ╔═╡ 3e653573-04db-4913-8771-2c23fe0e01a1
+begin
+	slope_li=result_li.minimizer[1];
+	C1_li=result_li.minimizer[2];
+	C2_li=result_li.minimizer[3];
+	nothing
+end
+
+# ╔═╡ b5fc8991-ae2d-4db4-a7f9-5da11a21e094
+begin
+	plt_linear = plot(xlabel="Time (d)", ylabel="RV (m/s)", title="RV data with linear model")
+	scatter!(plt_linear, data1.t,data1.rv.-C1_li,yerr=data1.σrv, label=instrument_label[df_star_by_inst[inst_idx1 ,:inst]], markercolor=inst_idx1)
+	if @isdefined inst_idx2
+		scatter!(plt_linear, data2.t,data2.rv.-C2_li,yerr=data2.σrv, label=instrument_label[df_star_by_inst[inst_idx2 ,:inst]], markercolor=inst_idx2)
+	
+	plot!([minimum([minimum(data2.t),minimum(data1.t)]),maximum([maximum(data2.t),maximum(data1.t)])],[slope_li*minimum([minimum(data2.t),minimum(data1.t)]),slope_li*maximum([maximum(data2.t),maximum(data1.t)])],label="Linear fit")
+	plt_linear
+	else
+	plot!([minimum(data1.t),maximum(data1.t)],[slope_li*minimum(data1.t),slope_li*maximum(data1.t)],label="Linear fit")
+	plt_linear
+	end
+end
+
+# ╔═╡ 7f8751c3-b087-401e-a098-25460bf496d9
+begin
+	resid_li1=data1.rv.-C1_li-slope_li.*data1.t
+	resid_li2=data2.rv.-C2_li-slope_li.*data2.t
+	
+	plt_resid_li = plot(legend=:none, widen=true)
+	scatter!(plt_resid_li,data1.t,
+				resid_li1,
+				yerr=data1.σrv, markercolor=inst_idx1)
+	
+	xlabel!(plt_resid_li,"Time (d)")
+	ylabel!(plt_resid_li,"RV (m/s)")
+
+	
+
+	if @isdefined inst_idx2
+	scatter!(plt_resid_li,data2.t,
+				resid_li2,
+				yerr=data2.σrv, markercolor=inst_idx2)
+	
+	end
+	
+	title!(plt_resid_li,"HD " * star_name * " (residuals to linear model)")
+	plt_resid_li
+end
+
+# ╔═╡ c2c32163-dcbc-4bfc-a172-e3d750ce6c4b
+if subtract_linear
+	for i=1:length(data1.rv)
+		data1.rv[i]=data1.rv[i]-C1_li-slope_li*data1.t[i]
+	end
+	for i=1:length(data2.rv)
+		data2.rv[i]=data2.rv[i]-C2_li-slope_li*data2.t[i]
+	end
+end
+
+# ╔═╡ 36e7d4ab-735e-4517-bf2e-ae1db69d227e
+loss_linear = loss_li(result_li.minimizer)
+
+# ╔═╡ d63c6ac8-3623-426e-b25f-668ffce47ddd
+let
+	expected_distribution = Chisq(nobs1+nobs2)
+	est_max_y = maximum(pdf.(expected_distribution,range(nobs1+nobs2/2,stop=1.5*(nobs1+nobs2),length=100)))
+
+	plt = plot(expected_distribution, xlabel="loss", ylabel="Probability", legend=:none)
+	plot!(plt,[loss_linear,loss_linear],[0,est_max_y], linestyle=:dot, linecolor=:black)
+end
+
+# ╔═╡ 44935b70-11a6-4804-a7cb-150d8660441b
+if loss_linear > nobs*10
+	warning_box(md"Linear model is probably not a good fit to the selected datasets.")
+end
+
+# ╔═╡ 0372f0ee-b238-403e-b045-1ade617a271d
+""" Calculate RV from t, P, K, e, ω, M0	and C with optional slope and t_mean"""
+function model_1pl(t, P, K, e, ω, M, C; slope=0.0, t_mean = 0.0)
+    calc_rv_keplerian(t-t_mean,P,K,e,ω,M) + C + slope * (t-t_mean)
+end
+
+
 # ╔═╡ 61379c75-6969-4652-b6ce-7e1e992f1f23
 """ Convert vector of (P,K,h,k,ω+M0) to vector of (P, K, e, ω, M0) """
 function PKhkωpM_to_PKeωM(x::Vector) 
@@ -530,24 +680,6 @@ function PKhkωpM_to_PKeωM(x::Vector)
     ω = atan(h,k)
     return [P, K, sqrt(h^2+k^2), ω, ωpM-ω]
 end
-
-# ╔═╡ ba55bc10-fb52-4135-8e9e-b3977a7369f2
-# ╠═╡ disabled = true
-#=╠═╡
-function loss_1pl(θ) 
-    (P1, K1, h1, k1, Mpω1, C1, C2, slope, σj ) = θ
-    ( P1, K1, e1, ω1, M1 ) = PKhkωpM_to_PKeωM([P1, K1, h1, k1, Mpω1])
-    if e1>1 return 1e6*e1 end
-    rv_model1 = model_1pl.(data1.t,P1,K1,e1,ω1,M1,C1, slope=slope, t_mean=t_mean)
-    loss = 0.5*sum(((rv_model1.-data1.rv)./(data1.σrv.+σj^2)).^2)
-    rv_model2 = model_1pl.(data2.t,P1,K1,e1,ω1,M1,C2, slope=slope, t_mean=t_mean)
-    loss += 0.5*sum((rv_model2.-data2.rv).^2 ./(data2.σrv.^2 .+σj^2))
-    loss += 0.5*sum(log.(2π*(data1.σrv.^2 .+σj^2)))
-    loss += 0.5*sum(log.(2π*(data2.σrv.^2 .+σj^2)))
-    return loss
-end
-
-  ╠═╡ =#
 
 # ╔═╡ 1d397e31-740e-41e7-ab4c-d6009752ee33
 """ Convert vector of (P,K,h,k,M0-ω) to vector of (P, K, e, ω, M0) """
@@ -561,12 +693,12 @@ end
 # ╔═╡ 71e66a2a-be4d-48f3-a868-bcd8f7647e22
 function make_loss_1pl(data1,data2; t_mean=0)
 	function loss_1pl(θ)
-		(P1, K1, h1, k1, Mpω1, C, σj ) = θ
+		(P1, K1, h1, k1, Mpω1, C1,C2, σj ) = θ
 		( P1, K1, e1, ω1, M1 ) = PKhkωMmω_to_PKeωM([P1, K1, h1, k1, Mpω1])
 		if e1>1 return 1e6*e1 end
-		rv_model1 = model_1pl.(data1.t,P1,K1,e1,ω1,M1,C, t_mean=t_mean)
+		rv_model1 = model_1pl.(data1.t,P1,K1,e1,ω1,M1,C1,t_mean=t_mean)
 		loss = 0.5*sum( (rv_model1.-data1.rv).^2 ./ (data1.σrv.^2 .+ σj^2) )
-		rv_model2 = model_1pl.(data2.t,P1,K1,e1,ω1,M1,C, t_mean=t_mean)
+		rv_model2 = model_1pl.(data2.t,P1,K1,e1,ω1,M1,C2, t_mean=t_mean)
 		loss += 0.5*sum( (rv_model2.-data2.rv).^2 ./ (data2.σrv.^2 .+ σj^2) )
 		loss += 0.5*sum(log.(2π*(data1.σrv.^2 .+σj^2)))
 		loss += 0.5*sum(log.(2π*(data2.σrv.^2 .+σj^2)))
@@ -613,13 +745,73 @@ function find_best_1pl_fit(θinit::AbstractVector, loss::Function; num_init_phas
 	result = result_list[best_result_id]
 end
 
-# ╔═╡ 34fa0f41-fae2-4854-8055-d9ee476c3eef
-	result = find_best_1pl_fit(init_guess, make_loss_1pl(data1,data2, t_mean=t_mean), num_init_phases = 1, num_init_ωs=4)
+# ╔═╡ 96851df0-0aad-44ac-830a-b5062917f4cf
+function fit_general_linear_least_squares( design_mat::ADM, covar_mat::APD, obs::AA ) where { ADM<:AbstractMatrix, APD<:AbstractPDMat, AA<:AbstractArray }
+   Xt_inv_covar_X = Xt_invA_X(covar_mat,design_mat)
+   X_inv_covar_y =  design_mat' * (covar_mat \ obs)
+   AB_hat = Xt_inv_covar_X \ X_inv_covar_y                   # standard GLS
+end
 
-# ╔═╡ d9568f71-edcb-45a7-80d7-0bd788d1f32c
-result.minimizer[1:5]
+# ╔═╡ 167cc8ad-cb04-47a1-bb25-08e9c345b24e
+function calc_design_matrix_circ!(result::AM, period, times::AV) where { R1<:Real, AM<:AbstractMatrix{R1}, AV<:AbstractVector{R1} }
+        n = length(times)
+        @assert size(result) == (n, 2)
+        for i in 1:n
+                ( result[i,1], result[i,2] ) = sincos(2π/period .* times[i])
+        end
+        return result
+end
+
+# ╔═╡ 5edca12e-e708-43d3-b0dc-4b70c1c4ea70
+function calc_design_matrix_circ(period, times::AV) where { R1<:Real, AV<:AbstractVector{R1} }
+        n = length(times)
+        dm = zeros(n,2)
+        calc_design_matrix_circ!(dm,period,times)
+        return dm
+end
+
+# ╔═╡ acff1e9d-038c-4267-9f85-37e21122988c
+# ╠═╡ skip_as_script = true
+#=╠═╡
+begin
+	param_fit_linear = fit_general_linear_least_squares(
+       calc_design_matrix_circ(P_guess,data1.t), PDiagMat(data1.σrv), data1.rv)
+	K_guess_def = sqrt(param_fit_linear[1]^2+param_fit_linear[2]^2)
+	phase_guess = atan(param_fit_linear[1],param_fit_linear[2]);
+	nothing
+end
+  ╠═╡ =#
+
+# ╔═╡ aae7b265-1ff7-4d5b-8d93-f0bb0bce575a
+#=╠═╡
+md"""
+Sometimes the estimation of K can be very sensitive to P. The default K is given by fitting data from the first chosen dataset to a circular model. If the default K looks suspicious or gives bad results, you can change K as you wish. 
+K: $(@bind K_guess NumberField(0:0.01:200, default=K_guess_def))
+"""
+  ╠═╡ =#
+
+# ╔═╡ 58b75f36-b9f5-4192-a796-73f65e497df2
+#=╠═╡
+begin
+	C1_guess=mean(data1.rv)
+	C2_guess=mean(data2.rv)
+	#init_guess=[4.23079,54.0364,-0.01,0.01,4.79533,C1_guess,C2_guess,3.0]
+	init_guess = [P_guess, K_guess, h_guess, k_guess, mod(phase_guess-atan(h_guess, k_guess),2π), C1_guess,C2_guess, σj_guess]
+end
+  ╠═╡ =#
+
+# ╔═╡ 34fa0f41-fae2-4854-8055-d9ee476c3eef
+#=╠═╡
+	result = find_best_1pl_fit(init_guess, make_loss_1pl(data1,data2, t_mean=t_mean), num_init_phases = 1, num_init_ωs=4)
+  ╠═╡ =#
+
+# ╔═╡ db3dca2a-86ed-4c6e-9477-175092eb538f
+#=╠═╡
+result.minimizer
+  ╠═╡ =#
 
 # ╔═╡ 34304691-cdd8-4cc0-a33e-e166c434eb4d
+#=╠═╡
 begin
 	plt_phase_all_after = plot(widen=false)
 	for inst in 1:num_inst
@@ -638,15 +830,98 @@ begin
 	title!(plt_phase_all_after,"HD " * star_name )
 	plt_phase_all_after
 end
+  ╠═╡ =#
+
+# ╔═╡ 255ce271-2011-4082-acaa-bfd4d972dc7b
+#=╠═╡
+if @isdefined result
+let
+	
+	#upscale
+	plt = plot() #legend=:none, widen=true)
+	num_inst = size(df_star_by_inst,1)
+	rvoffset = zeros(4) # [result2.minimizer[11], result2.minimizer[12], 0, 0]
+	rvoffset[inst_idx1]= result.minimizer[6]
+	
+	
+		
+		#plot!(t_plt,model_1pl)
+		#plot!(t_plt.-2450000,model_2pl)
+		#scatter!(df_star_by_inst[2,:bjd].-2450000,df_star_by_inst[2,:rv], yerr=collect(df_star_by_inst[2,:σrv]),label=:none)
+		#scatter!(df_star_by_inst[3,:bjd].-2450000,df_star_by_inst[3,:rv], yerr=collect(df_star_by_inst[3,:σrv]),label=:none)
+		#scatter!(df_star_by_inst[4,:bjd].-2450000,df_star_by_inst[4,:rv], yerr=collect(df_star_by_inst[4,:σrv]),label=:none)
+	
+	pred_1pl = map(t->model_1pl(t,PKhkωMmω_to_PKeωM(result.minimizer[1:5])...,0.0,slope=0.0, t_mean=t_mean),t_plt);
+	plot!(t_plt,pred_1pl, label=:none)
+	xlabel!("Time (d)")
+	ylabel!("RV (m/s)")
+	title!("HD " * star_name )
+	#savefig(plt,joinpath(homedir(),"Downloads","RvEx.pdf"))
+	if @isdefined inst_idx2
+		rvoffset[inst_idx2]= result.minimizer[7]
+		scatter!(plt, data2.t,data2.rv.-rvoffset[inst_idx2],yerr=data2.σrv, label=instrument_label[df_star_by_inst[inst_idx2 ,:inst]], markercolor=inst_idx2)
+	end
+	slope = 0 #result.minimizer[8]
+	scatter!(plt, data1.t,data1.rv.-rvoffset[inst_idx1],yerr=data1.σrv, label=instrument_label[df_star_by_inst[inst_idx1 ,:inst]], markercolor=inst_idx1)
+	plt
+end
+end
+  ╠═╡ =#
+
+# ╔═╡ 4a3292ab-cfa2-4b58-ba66-19a23f8f2a23
+#=╠═╡
+begin
+pred_1pl1 = map(t->model_1pl(t,PKhkωMmω_to_PKeωM(result.minimizer[1:5])...,0.0, t_mean=t_mean),data1.t)
+			pred_1pl2 = map(t->model_1pl(t,PKhkωMmω_to_PKeωM(result.minimizer[1:5])...,0.0, t_mean=t_mean),data2.t)
+			resid1 = data1.rv.-result.minimizer[6]-pred_1pl1
+			resid2 = data2.rv.-result.minimizer[7]-pred_1pl2
+nothing
+end
+  ╠═╡ =#
+
+# ╔═╡ 3a51761b-8659-4c42-9612-28d6daaf7404
+#=╠═╡
+if @isdefined resid1
+	plt_resid = plot(legend=:none, widen=true)
+	scatter!(plt_resid,data1.t,
+				resid1,
+				yerr=data1.σrv, markercolor=inst_idx1)
+	
+	xlabel!(plt_resid,"Time (d)")
+	ylabel!(plt_resid,"RV (m/s)")
+
+	plt_resid_phase = plot(legend=:none, widen=false)
+	phase = mod.(data1.t ./ result.minimizer[1],1.0)
+	scatter!(plt_resid_phase,phase,
+				resid1,
+				yerr=data1.σrv, markercolor=inst_idx1)
+
+	if @isdefined inst_idx2
+	scatter!(plt_resid,data2.t,
+				resid2,
+				yerr=data2.σrv, markercolor=inst_idx2)
+	scatter!(plt_resid_phase,phase,
+				resid2,
+				yerr=data2.σrv, markercolor=inst_idx2)
+	end
+	xlabel!(plt_resid_phase,"Phase")
+	ylabel!(plt_resid_phase,"RV (m/s)")
+	title!(plt_resid,"HD " * star_name * " (residuals to 1 planet model)")
+	plot(plt_resid, plt_resid_phase, layout=(2,1) )
+end
+  ╠═╡ =#
 
 # ╔═╡ 7d7fba67-c78a-44fe-bd9b-d8d4967b32c7
+#=╠═╡
 begin
 	num_bootstrap_samples=100
 results_bootstrap = Array{Any}(undef,num_bootstrap_samples)
 	rms_bootstrap = zeros(num_bootstrap_samples)
 	rms_bootstrap_train = zeros(num_bootstrap_samples)
 	testset_length = zeros(num_bootstrap_samples)
-	for i in 1:num_bootstrap_samples
+	not_converge_flag=0
+	not_converge_index=[]
+	for i = 1:num_bootstrap_samples
 		# Select sample of points to fit
 		idx1 = sample(1:length(data1.t),length(data1.t))
 		idx2 = sample(1:length(data2.t),length(data2.t))
@@ -657,14 +932,58 @@ results_bootstrap = Array{Any}(undef,num_bootstrap_samples)
 
 		loss_tmp = make_loss_1pl(data_tmp1,data_tmp2, t_mean=t_mean)
 		# Attempt to find best-fit parameters results for resampled data
-		results_bootstrap[i] = find_best_1pl_fit(init_guess, loss_tmp, num_init_phases=1, num_init_ωs=4)
+		try 
+			find_best_1pl_fit(result.minimizer[1:8], loss_tmp, num_init_phases=1, num_init_ωs=4).minimizer
+		catch e
+			if e==ErrorException("type NamedTuple has no field minimizer")
+				not_converge_flag=1
+				println("Does not converge")
+				push!(not_converge_index,i)
+				continue
+			end
+
+		end
+		results_bootstrap[i]=find_best_1pl_fit(result.minimizer[1:8], loss_tmp, num_init_phases=1, num_init_ωs=4)
 		# Evaluate residuals for cross validation
+		if hasfield(typeof(results_bootstrap[i]),:minimizer)
+			idx_train1 = filter(i->(i∈idx1), 1:length(data1.t))
+			idx_train2 = filter(i->(i∈idx2), 1:length(data2.t))
+			if length(idx_train1) == 0 continue end
+			pred_1pl1 = map(t->model_1pl(t,PKhkωMmω_to_PKeωM(results_bootstrap[i].minimizer[1:5])...,0.0, t_mean=t_mean),view(data1.t,idx_train1))
+			pred_1pl2 = map(t->model_1pl(t,PKhkωMmω_to_PKeωM(results_bootstrap[i].minimizer[1:5])...,0.0, t_mean=t_mean),view(data2.t,idx_train2))
+			resid1 = view(data1.rv,idx_train1).-results_bootstrap[i].minimizer[6]-pred_1pl1
+			resid2 = view(data2.rv,idx_train2).-results_bootstrap[i].minimizer[7]-pred_1pl2
+			resid=vcat(resid1,resid2)
+			rms_bootstrap_train[i] = sqrt(mean(resid.^2))
+				
+			idx_test1 = filter(i->!(i∈idx1), 1:length(data1.t))
+			idx_test2 = filter(i->!(i∈idx2), 1:length(data2.t))
+			testset_length[i] = length(idx_test1)+length(idx_test2)
+			if testset_length[i] == 0 continue end
+			pred_1pl1 = map(t->model_1pl(t,PKhkωMmω_to_PKeωM(results_bootstrap[i].minimizer[1:5])...,0.0, t_mean=t_mean),view(data1.t,idx_test1))
+			pred_1pl2 = map(t->model_1pl(t,PKhkωMmω_to_PKeωM(results_bootstrap[i].minimizer[1:5])...,0.0, t_mean=t_mean),view(data2.t,idx_test2))
+			resid1 = view(data1.rv,idx_test1).-results_bootstrap[i].minimizer[6]-pred_1pl1
+			resid2 = view(data2.rv,idx_test2).-results_bootstrap[i].minimizer[7]-pred_1pl2
+			resid=vcat(resid1,resid2)
+			rms_bootstrap[i] = sqrt(mean(resid.^2))
+			
 		
 	end
-	results_bootstrap
+	end
+	results_bootstrap=results_bootstrap[Not(not_converge_index)]
+	nothing
 end
+  ╠═╡ =#
+
+# ╔═╡ e30755c3-e701-4fd6-a244-6755ed6603d3
+#=╠═╡
+if not_converge_flag==1
+	warning_box(md"Several samples do not converge.")
+end
+  ╠═╡ =#
 
 # ╔═╡ 79e5a375-3c16-4443-86b9-d3bbad6101d4
+#=╠═╡
 if @isdefined results_bootstrap
 	plt_title = plot(title = "Bootstrap Results", grid = false, showaxis = false, ticks=:none, bottom_margin = -25Plots.px)
 
@@ -708,24 +1027,55 @@ if @isdefined results_bootstrap
 	optimize_ticks(minimum(Mmωsample),maximum(Mmωsample),k_max=3)[1])
 	histogram!(plt_Mmω_hist,ωsample, label=:none, nbins=50)
 
-	local Csample = map(r->r.minimizer[6],results_bootstrap)
-	C_mean_bootstrap = mean(Csample)
-	C_std_bootstrap = std(Csample)
-	plt_C_hist = plot(xlabel="C", ylabel="Samples",xticks=
-	optimize_ticks(minimum(Csample),maximum(Csample),k_max=2)[1])
-	histogram!(plt_C_hist,Csample, label=:none, nbins=50)
+	local C1sample = map(r->r.minimizer[6],results_bootstrap)
+	C1_mean_bootstrap = mean(C1sample)
+	C1_std_bootstrap = std(C1sample)
+	plt_C1_hist = plot(xlabel="C1", ylabel="Samples",xticks=
+	optimize_ticks(minimum(C1sample),maximum(C1sample),k_max=2)[1])
+	histogram!(plt_C1_hist,C1sample, label=:none, nbins=50)
 
-	local σjsample = map(r->r.minimizer[7],results_bootstrap)
+	if @isdefined inst_idx2
+		local C2sample = map(r->r.minimizer[7],results_bootstrap)
+		C2_mean_bootstrap = mean(C2sample)
+		C2_std_bootstrap = std(C2sample)
+		plt_C2_hist = plot(xlabel="C2", ylabel="Samples",xticks=
+		optimize_ticks(minimum(C2sample),maximum(C2sample),k_max=2)[1])
+		histogram!(plt_C2_hist,C2sample, label=:none, nbins=50)
+	end
+
+	local σjsample = map(r->r.minimizer[8],results_bootstrap)
 	σj_mean_bootstrap = mean(σjsample)
 	σj_std_bootstrap = std(σjsample)
 	plt_σj_hist = plot(xlabel="σⱼ", ylabel="Samples",xticks=
 	optimize_ticks(minimum(σjsample),maximum(σjsample),k_max=3)[1])
 	histogram!(plt_σj_hist,σjsample, label=:none, nbins=50)
-
-	bootstrap_results_df = DataFrame(:parameter=>[:P, :K, :h, :k, :e, :ω, :Mmω, :C, :σj], :mean=>[P_mean_bootstrap, K_mean_bootstrap, h_mean_bootstrap, k_mean_bootstrap, e_mean_bootstrap, ω_mean_bootstrap, Mmω_mean_bootstrap, C_mean_bootstrap, σj_mean_bootstrap], :std=>[P_std_bootstrap,K_std_bootstrap,h_std_bootstrap,k_std_bootstrap,e_std_bootstrap,ω_std_bootstrap,Mmω_std_bootstrap,C_std_bootstrap,σj_std_bootstrap])
+	if @isdefined inst_idx2
+		bootstrap_results_df = DataFrame(:parameter=>[:P, :K, :h, :k, :e, :ω, :Mmω, :C1,:C2, :σj], :mean=>[P_mean_bootstrap, K_mean_bootstrap, h_mean_bootstrap, k_mean_bootstrap, e_mean_bootstrap, ω_mean_bootstrap, Mmω_mean_bootstrap, C1_mean_bootstrap, C2_mean_bootstrap, σj_mean_bootstrap], :std=>[P_std_bootstrap,K_std_bootstrap,h_std_bootstrap,k_std_bootstrap,e_std_bootstrap,ω_std_bootstrap,Mmω_std_bootstrap,C1_std_bootstrap, C2_std_bootstrap,σj_std_bootstrap])
 	
-	plot(plt_title, plt_P_hist, plt_K_hist, plt_e_hist, plt_ω_hist, plt_C_hist, plt_σj_hist, layout=@layout([A{0.01h}; [B C; D E; F G ]]), size=(600,600) )
+		plot(plt_title, plt_P_hist, plt_K_hist, plt_e_hist, plt_ω_hist, plt_C1_hist, plt_C2_hist, plt_σj_hist, layout=@layout([A{0.01h}; [B C; D E; F G;H ]]), size=(600,600) )
+	else
+		bootstrap_results_df = DataFrame(:parameter=>[:P, :K, :h, :k, :e, :ω, :Mmω, :C1, :σj], :mean=>[P_mean_bootstrap, K_mean_bootstrap, h_mean_bootstrap, k_mean_bootstrap, e_mean_bootstrap, ω_mean_bootstrap, Mmω_mean_bootstrap, C1_mean_bootstrap,  σj_mean_bootstrap], :std=>[P_std_bootstrap,K_std_bootstrap,h_std_bootstrap,k_std_bootstrap,e_std_bootstrap,ω_std_bootstrap,Mmω_std_bootstrap,C1_std_bootstrap, σj_std_bootstrap])
+
+		plot(plt_title, plt_P_hist, plt_K_hist, plt_e_hist, plt_ω_hist, plt_C1_hist,  plt_σj_hist, layout=@layout([A{0.01h}; [B C; D E; F G ]]), size=(600,600) )
+	end
 end
+  ╠═╡ =#
+
+# ╔═╡ c344a8d1-da07-4206-87d2-92924e133001
+#=╠═╡
+if @isdefined bootstrap_results_df
+   bootstrap_results_df
+end
+  ╠═╡ =#
+
+# ╔═╡ 2d40a7b2-f650-45e0-978e-eca24954faa6
+#=╠═╡
+begin
+	plt_bootstrap_resid = plot(xlabel="RMS RV Residuals (m/s)", ylabel="Samples")
+	histogram!(plt_bootstrap_resid, rms_bootstrap, nbins=40, label="Test points", alpha=0.5)
+	histogram!(plt_bootstrap_resid, rms_bootstrap_train, nbins=40, label="Training points", alpha=0.5)
+end
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2560,69 +2910,97 @@ version = "1.4.1+0"
 # ╟─6d090107-d691-4a68-91ad-c7dae5df35ad
 # ╟─8f829f16-553a-11ed-3fd9-9f77ddd265d5
 # ╟─a6eedc20-0171-48c7-938f-daee0ce4f8e9
-# ╠═6162976e-34ff-498a-ac7c-3dafd80fb4a4
+# ╟─519b083c-aa8d-48da-b9ec-6e3cddf94d99
+# ╟─f3bbb76c-14cd-4566-935b-5c1f6949eaf5
+# ╟─2350b4a6-a538-430e-b832-4ecb4a458c4d
+# ╟─2de85bb1-881f-483a-bcdb-2109ed795ec5
+# ╟─bfc1affc-b392-4884-a35f-55593af7db53
 # ╟─e71bdd5e-a50e-46b2-8249-55ad7dffb789
-# ╟─08f0978c-a04c-452a-87e6-ca6df2fb5893
-# ╟─87ad2397-39a1-4d1e-b8c2-883639d99015
-# ╠═519b083c-aa8d-48da-b9ec-6e3cddf94d99
-# ╠═f3bbb76c-14cd-4566-935b-5c1f6949eaf5
 # ╟─4a949edb-8737-4439-a1c0-14641bd99f8c
-# ╠═2350b4a6-a538-430e-b832-4ecb4a458c4d
-# ╠═d7bf3366-0283-43a7-b440-ce9abb677d0f
-# ╠═2de85bb1-881f-483a-bcdb-2109ed795ec5
-# ╠═1405994c-2340-4a1d-80c6-0a62e0ed72c8
-# ╠═bfc1affc-b392-4884-a35f-55593af7db53
-# ╠═6f000c6d-14a8-4d6d-97f8-d01f4dd516bc
-# ╠═e3b46289-f602-4dee-81cc-91c8466dcd5a
-# ╠═383d9191-fc82-4f9c-81f5-837a67c71e9b
-# ╠═66446e92-0d84-4d2b-9804-a563fbd8e30b
-# ╠═3f20587c-8843-495e-a77f-c918e48f86e2
-# ╟─e53d6766-4fb1-4bda-822e-9e468b440fdf
-# ╟─3bc0583f-bfa6-49ce-9352-f5b504279ce3
-# ╠═25879a59-5aaa-40de-a289-998cda21448d
-# ╠═1121402e-69d9-4d3b-bec9-c4011e226675
-# ╟─ec77269a-6cf8-420f-a7ef-75f15e30de28
-# ╠═b8ec7c40-5075-4cd9-89dd-b649e53d8558
-# ╟─68a49dcb-3cd9-4905-abf6-d43083d256ce
-# ╠═59069f4e-58fa-458a-8c47-4176e3970f43
-# ╠═17b1760d-ed77-4773-8147-43245c70a962
-# ╠═a435c976-de91-40a6-b536-9cf005027a3b
-# ╠═163fd9dc-daed-489c-bd23-ff2ae816c69d
+# ╟─6f000c6d-14a8-4d6d-97f8-d01f4dd516bc
+# ╟─e4084b5c-19de-460d-aceb-ee6f3cfafbd9
+# ╟─e3b46289-f602-4dee-81cc-91c8466dcd5a
+# ╟─8f239f05-2610-42ce-92c6-968943418328
+# ╟─64987161-afde-4b4d-93a8-19f7b40aeae7
+# ╟─383d9191-fc82-4f9c-81f5-837a67c71e9b
+# ╟─10290d00-c667-46f3-a03e-8fb33842448a
+# ╟─32a6f1f8-c213-40c1-a6c1-5dc7ce87976e
+# ╟─66446e92-0d84-4d2b-9804-a563fbd8e30b
+# ╟─a435c976-de91-40a6-b536-9cf005027a3b
 # ╟─0b49db68-973a-42e0-8eed-4f4405b5f808
 # ╟─5a929ea7-93cc-4c4d-9340-734bcd509719
-# ╟─deb25ff2-c774-48e4-8ef7-9afcbf86f3d9
-# ╟─433c228f-4168-44dd-8d44-8b2c5c579e89
-# ╟─294a349b-02d0-461e-8a78-ab3b87b510ed
-# ╠═640c9851-73ba-47ed-84e4-6484f3b793b2
-# ╟─c806b3eb-9c0b-4a96-b21a-03cb17c4bc2c
-# ╠═159b2a95-26d1-4017-9f3c-db8467ef7623
-# ╠═36e7d4ab-735e-4517-bf2e-ae1db69d227e
+# ╟─640c9851-73ba-47ed-84e4-6484f3b793b2
+# ╟─b5fc8991-ae2d-4db4-a7f9-5da11a21e094
+# ╟─2b35c01d-1bd1-4cdd-a9e6-5f61652bf36e
+# ╟─7f8751c3-b087-401e-a098-25460bf496d9
+# ╟─d24fbe45-dc19-4946-9958-b3f26650d572
+# ╟─75e5df52-18ab-4046-a2a0-fdaea68d9543
+# ╟─3e653573-04db-4913-8771-2c23fe0e01a1
+# ╟─7e9f805c-80c4-472f-a3ea-f73a732b8a57
+# ╟─36e7d4ab-735e-4517-bf2e-ae1db69d227e
+# ╟─bb799c04-0e8c-4f02-a831-0acaa36d20c7
+# ╟─59bc7b62-87f8-42bb-80d0-74d4cf2c9edf
+# ╟─62e93800-22bd-40a1-9ee6-bcd1134539ae
 # ╟─d63c6ac8-3623-426e-b25f-668ffce47ddd
+# ╟─44935b70-11a6-4804-a7cb-150d8660441b
+# ╟─09020d68-05d3-4908-9dcc-c1e0097cd54c
+# ╟─c2c32163-dcbc-4bfc-a172-e3d750ce6c4b
+# ╟─963230d5-cef8-4a9c-aef4-319cbd75c207
+# ╟─e53d6766-4fb1-4bda-822e-9e468b440fdf
+# ╟─3bc0583f-bfa6-49ce-9352-f5b504279ce3
+# ╟─1ce61116-86e3-4488-b2ec-a0d7617bb4b3
+# ╠═1121402e-69d9-4d3b-bec9-c4011e226675
+# ╟─ec77269a-6cf8-420f-a7ef-75f15e30de28
+# ╟─b8ec7c40-5075-4cd9-89dd-b649e53d8558
+# ╟─b51622f7-baf7-4ab5-861e-dd7f5a707fdb
+# ╟─68a49dcb-3cd9-4905-abf6-d43083d256ce
+# ╟─59069f4e-58fa-458a-8c47-4176e3970f43
+# ╟─17b1760d-ed77-4773-8147-43245c70a962
 # ╟─3b21b28a-52f0-4da0-beba-bb09d666b9c6
+# ╟─f46cbed8-dec6-4bb2-8942-4fe96ebea3e4
 # ╟─acff1e9d-038c-4267-9f85-37e21122988c
-# ╠═f46cbed8-dec6-4bb2-8942-4fe96ebea3e4
-# ╠═3862a20f-672e-4d61-aba8-41565b2a79ae
-# ╠═f71d567d-d026-4859-b74d-87bc278b01be
-# ╠═b6753753-48c6-4fc3-92a5-061fd2f8d37f
+# ╟─aae7b265-1ff7-4d5b-8d93-f0bb0bce575a
+# ╟─2384f27b-05d7-45f8-a18c-75bcdea14b80
+# ╟─58b75f36-b9f5-4192-a796-73f65e497df2
 # ╠═34fa0f41-fae2-4854-8055-d9ee476c3eef
-# ╠═d9568f71-edcb-45a7-80d7-0bd788d1f32c
-# ╠═ba55bc10-fb52-4135-8e9e-b3977a7369f2
-# ╠═ee34c025-55c9-4136-b8c8-6ddaa678431a
-# ╠═34304691-cdd8-4cc0-a33e-e166c434eb4d
+# ╟─6b5c4ec5-3b54-47e6-ad0b-d9a813b7bb7a
+# ╠═db3dca2a-86ed-4c6e-9477-175092eb538f
+# ╟─69f83e46-8788-42ae-945d-3fb27b78a36f
+# ╟─34304691-cdd8-4cc0-a33e-e166c434eb4d
+# ╟─1d9f11ce-1515-4d75-9a30-55db3b3fa8ae
+# ╟─255ce271-2011-4082-acaa-bfd4d972dc7b
+# ╟─4a3292ab-cfa2-4b58-ba66-19a23f8f2a23
+# ╟─8af96ff4-3c14-4667-9a31-d1aa22f927db
+# ╟─3a51761b-8659-4c42-9612-28d6daaf7404
 # ╟─a494b98a-08df-464c-b3f4-584463f4210c
-# ╠═7d7fba67-c78a-44fe-bd9b-d8d4967b32c7
-# ╠═79e5a375-3c16-4443-86b9-d3bbad6101d4
+# ╟─d4eb252e-5d56-405d-9004-0cc0cbe05b98
+# ╟─7d7fba67-c78a-44fe-bd9b-d8d4967b32c7
+# ╟─e30755c3-e701-4fd6-a244-6755ed6603d3
+# ╟─173f7237-e446-4220-90ab-ab8d9cad8b64
+# ╟─79e5a375-3c16-4443-86b9-d3bbad6101d4
+# ╟─7f720fc1-3004-41af-a570-46183ed4b646
+# ╟─c344a8d1-da07-4206-87d2-92924e133001
+# ╟─22ebdf59-a508-44f3-9db8-031b37c4446d
+# ╟─2d40a7b2-f650-45e0-978e-eca24954faa6
+# ╟─a40a805d-48a7-4451-b958-56ef041d3333
 # ╟─769de9c4-6167-4550-be08-320c7c63fe3e
 # ╠═7c2ceba1-6e8a-4a5f-845d-73b97810c099
+# ╟─9d1eadf9-7fe9-4620-b866-4a442033a0b4
+# ╟─5736df1b-a0c9-47b2-9cfe-faf01641ce26
 # ╟─74170a94-2014-45fd-9f1d-d476b1febf14
 # ╟─0f2ee09b-1d31-4a34-9b0a-22e8b91f4303
 # ╟─6cea0d3e-daed-4318-83b0-13bf9fe00d2a
 # ╟─5dcd30d7-dd60-4b15-96a6-4b222e55d779
 # ╟─c67d1588-36e4-44aa-a98b-8308bf57e1e0
 # ╟─d892f267-8a1f-41e8-9104-573ec424abc9
-# ╠═71e66a2a-be4d-48f3-a868-bcd8f7647e22
+# ╟─2293d249-407a-4578-8eb8-377a3ef44e68
+# ╟─71e66a2a-be4d-48f3-a868-bcd8f7647e22
+# ╟─0372f0ee-b238-403e-b045-1ade617a271d
 # ╟─61379c75-6969-4652-b6ce-7e1e992f1f23
 # ╟─1d397e31-740e-41e7-ab4c-d6009752ee33
 # ╟─514730e4-f589-4841-a4db-4b39e746e6a9
+# ╟─96851df0-0aad-44ac-830a-b5062917f4cf
+# ╟─167cc8ad-cb04-47a1-bb25-08e9c345b24e
+# ╟─5edca12e-e708-43d3-b0dc-4b70c1c4ea70
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
