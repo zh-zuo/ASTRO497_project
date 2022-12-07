@@ -26,24 +26,24 @@ begin
 	using Downloads
 	using Random
 	using LombScargle
+	using MarkdownLiteral
 	Random.seed!(123)
 end
 
 # ╔═╡ f53f1d9f-8be8-4dcc-a637-f39b1eaacd63
 md"""
 **Astro 497 Project**
-# Analyze Orbit Parameters and Planet Mass
+# Analyze Orbit Parameters
+"""
+
+# ╔═╡ 6d090107-d691-4a68-91ad-c7dae5df35ad
+md"""
+Our project aims to construct a dashboard that ingests radial velocity observation data and analyzes orbit parameters. In our dashboard, we
+will utilize The California Legacy Survey (Rosenthal et al., 2021) data.
 """
 
 # ╔═╡ 8cf8e22c-af0f-422b-89a1-109291cd749a
 TableOfContents()
-
-# ╔═╡ 6d090107-d691-4a68-91ad-c7dae5df35ad
-md"""
-# Overview 
-Our project aims to construct a dashboard that ingests radial velocity observation data and analyzes orbit parameters. In our dashboard, we
-will utilize The California Legacy Survey (Rosenthal et al., 2021) data.
-"""
 
 # ╔═╡ 8f829f16-553a-11ed-3fd9-9f77ddd265d5
 md"""
@@ -75,9 +75,6 @@ begin
 
 end
 
-# ╔═╡ bfc1affc-b392-4884-a35f-55593af7db53
-t_offset = 2455000; 
-
 # ╔═╡ e71bdd5e-a50e-46b2-8249-55ad7dffb789
 begin
 	select_star_id = PlutoRunner.currently_running_cell_id[] |> string
@@ -88,6 +85,131 @@ Please select a star to be analyzed: $(@bind selected_star Select(collect(values
 """
 
 end
+
+# ╔═╡ 4a949edb-8737-4439-a1c0-14641bd99f8c
+md"""
+All available RV data for the selected star are plotted below.
+"""
+
+# ╔═╡ e4084b5c-19de-460d-aceb-ee6f3cfafbd9
+md"""
+Number of data points for each instrument is listed below. You can select the dataset to be analyzed based on this information.
+"""
+
+# ╔═╡ 64987161-afde-4b4d-93a8-19f7b40aeae7
+md"""
+The dashboard can handle data from one instrument or two instruments. The default option is to use two instruments. You can click the checkbox if you want to fit the models with data from only one instrument.\
+Fit with only one instrument:$(@bind fit_with_one CheckBox())
+"""
+
+# ╔═╡ 0b49db68-973a-42e0-8eed-4f4405b5f808
+md"""
+# Fitting a linear model
+"""
+
+# ╔═╡ 5a929ea7-93cc-4c4d-9340-734bcd509719
+md"""
+A star without any planet is expected to have linear radial velocity. We fit a linear model to our data and see if it is a good fit. Sometimes, if the data seems to be linear, it is a good idea to subract linear part to see the deviations.
+"""
+
+# ╔═╡ 62e93800-22bd-40a1-9ee6-bcd1134539ae
+md"""
+The expected distribution of loss and the loss value at mle are plotted in the following figure.
+"""
+
+# ╔═╡ 09020d68-05d3-4908-9dcc-c1e0097cd54c
+md"""
+If you want to subtract linear fitting results from the data, click the checkbox: $(@bind subtract_linear CheckBox()). \
+Warning: Only do this if the data looks to be linear and you want to investigate small deviations around the linear relationship. It is generally not suggested to subtract the linear fitting results.
+"""
+
+# ╔═╡ e53d6766-4fb1-4bda-822e-9e468b440fdf
+md"""
+# Lomb-Scargle
+"""
+
+# ╔═╡ 68a49dcb-3cd9-4905-abf6-d43083d256ce
+
+warning_box(md"
+1. Please try each instrument and use the one that gives the best periodogram.
+1. Please visually inspect the peaks of power. To investigate different peaks (period), the user can change the periodogram range above. If there is a sharp peak with a very small period, it is suggested to set ~1% in the above box to detect possible hot Jupiters.
+1. Periodiagram is not helpful for planets with periods longer than the observation duration.
+")
+
+# ╔═╡ 3b21b28a-52f0-4da0-beba-bb09d666b9c6
+md"""
+# Fitting one planet model
+"""
+
+# ╔═╡ 2384f27b-05d7-45f8-a18c-75bcdea14b80
+md"""
+The initial guesses are (P, K, h, k, M0-ω, C1, C2,σj):
+"""
+
+# ╔═╡ 6b5c4ec5-3b54-47e6-ad0b-d9a813b7bb7a
+md"""
+The results of model fitting are(P, K, h, k, M0-ω, C1, C2,σj):
+"""
+
+# ╔═╡ 69f83e46-8788-42ae-945d-3fb27b78a36f
+md"""
+To see how reasonable the fitted period is, check the Appendix for the plot where RV data is re-grouped by phase.
+"""
+
+# ╔═╡ 1d9f11ce-1515-4d75-9a30-55db3b3fa8ae
+md"""
+The RV observations used for the model fitting, together with the resulting model, are plotted below. 
+"""
+
+# ╔═╡ a494b98a-08df-464c-b3f4-584463f4210c
+md"""
+# Model Assessment
+"""
+
+# ╔═╡ fb7ddbe7-6f42-4a6d-8d28-611df2cdf549
+@bind bootstrap confirm(PlutoUI.combine() do Child
+md"""
+**Bootstrap Parameter**
+
+Number of samples  $(Child("num_bootstrap_samples", NumberField(10:10:10_000; default=100)))
+
+
+
+Ready to run bootstrap: $(Child("run", CheckBox()))
+""" end )
+
+# ╔═╡ 7f720fc1-3004-41af-a570-46183ed4b646
+md"""
+The means and standard deviations of orbit parameters.
+"""
+
+# ╔═╡ 6926b12f-d5e9-475a-8248-2a4f0e0f18b5
+md"""
+If you want to see the distributions of parameters given by bootstrap similations, check the Appendix.
+"""
+
+# ╔═╡ 22ebdf59-a508-44f3-9db8-031b37c4446d
+md"""
+The cross-validation results are shown below.
+"""
+
+# ╔═╡ a40a805d-48a7-4451-b958-56ef041d3333
+warning_box(md"This fitting method does not perform well for orbits with extremely long periods (>10000days). Please be cautious.")
+
+# ╔═╡ 200c1f28-0eb3-459f-91f8-a0c38cb92bed
+md"""
+# Appendix
+"""
+
+# ╔═╡ 59069f4e-58fa-458a-8c47-4176e3970f43
+md"""
+The radial velocity with respect to phase plot, using the period with maximum power provided by lomb-scargle periodogram. The RV value for different instruments is randomly separated. 
+"""
+
+# ╔═╡ 5712b24d-cfff-4c95-8008-dfad4dc32a2c
+md"""
+RV data re-grouped by phasen is plotted below, using the period derived from the one planet keplerian model.
+"""
 
 # ╔═╡ 519b083c-aa8d-48da-b9ec-6e3cddf94d99
 starid = searchsortedfirst(star_names,selected_star);
@@ -127,10 +249,11 @@ end;
 	instrument_label
 end;
 
-# ╔═╡ 4a949edb-8737-4439-a1c0-14641bd99f8c
-md"""
-All available RV data for the selected star are plotted below.
-"""
+# ╔═╡ e3b46289-f602-4dee-81cc-91c8466dcd5a
+df_star_by_inst |> @map( {:inst=>instrument_label[_.inst], :num_obs=>_.nobs_inst}) |> DataFrame
+
+# ╔═╡ bfc1affc-b392-4884-a35f-55593af7db53
+t_offset = 2455000; 
 
 # ╔═╡ 6f000c6d-14a8-4d6d-97f8-d01f4dd516bc
 begin
@@ -139,7 +262,7 @@ begin
 	for inst in 1:num_inst
 		rvoffset = mean(df_star_by_inst[inst,:rv])
 		scatter!(plt_rv_all_inst,df_star_by_inst[inst,:bjd].-t_offset,
-				df_star_by_inst[inst,:rv].-rvoffset,
+				df_star_by_inst[inst,:rv],
 				yerr=collect(df_star_by_inst[inst,:σrv]),
 				label=instrument_label[df_star_by_inst[inst,:inst]], markercolor=inst)
 				#markersize=4*upscale, legendfontsize=upscale*12
@@ -150,14 +273,6 @@ begin
 	plt_rv_all_inst
 end
 
-# ╔═╡ e4084b5c-19de-460d-aceb-ee6f3cfafbd9
-md"""
-Number of data points for each instrument is listed below. You can select the dataset to be analyzed based on this information.
-"""
-
-# ╔═╡ e3b46289-f602-4dee-81cc-91c8466dcd5a
-df_star_by_inst |> @map( {:inst=>instrument_label[_.inst], :num_obs=>_.nobs_inst}) |> DataFrame
-
 # ╔═╡ 8f239f05-2610-42ce-92c6-968943418328
 begin
 	inst_list=[]
@@ -166,12 +281,6 @@ begin
 		push!(inst_list,i)
 	end
 end
-
-# ╔═╡ 64987161-afde-4b4d-93a8-19f7b40aeae7
-md"""
-The dashboard can handle data from one instrument or two instruments. The default option is to use two instruments. You can click the checkbox if you want to fit the models with data from only one instrument.\
-Fit with only one instrument:$(@bind fit_with_one CheckBox())
-"""
 
 # ╔═╡ 383d9191-fc82-4f9c-81f5-837a67c71e9b
 begin
@@ -189,6 +298,12 @@ Select second instrument's data to analyze: $(@bind inst2 Select(collect(values(
 """
 end
 
+# ╔═╡ 1ce61116-86e3-4488-b2ec-a0d7617bb4b3
+
+md"""
+Select the instrument for periodogram: $(@bind inst_per Select(collect(values(instrument_label)); default=inst_list[1])). Generate the Periodogram with a period up to $(@bind periodogram_range NumberField(0:0.1:500, default=50))% of the observation period of the selected instrument. 
+"""
+
 # ╔═╡ 32a6f1f8-c213-40c1-a6c1-5dc7ce87976e
 begin
 	inst_idx1 = findfirst(isequal(inst1),map(k->instrument_label[k], df_star_by_inst[:,:inst]));
@@ -196,15 +311,6 @@ begin
 		inst_idx2 = findfirst(isequal(inst2),map(k->instrument_label[k], df_star_by_inst[:,:inst]));
 	end
 	nothing
-end
-
-# ╔═╡ 66446e92-0d84-4d2b-9804-a563fbd8e30b
-begin
-	plt_1inst = plot(xlabel="Time (d)", ylabel="RV (m/s)", title="RVs from instrument being fit")
-	scatter!(plt_1inst, df_star_by_inst[inst_idx1,:bjd].-t_offset,df_star_by_inst[inst_idx1,:rv],yerr=df_star_by_inst[inst_idx1,:σrv], label=instrument_label[df_star_by_inst[inst_idx1 ,:inst]], markercolor=inst_idx1)
-	if @isdefined inst_idx2
-		scatter!(plt_1inst, df_star_by_inst[inst_idx2,:bjd].-t_offset,df_star_by_inst[inst_idx2,:rv],yerr=df_star_by_inst[inst_idx2,:σrv], label=instrument_label[df_star_by_inst[inst_idx2 ,:inst]], markercolor=inst_idx2)
-	end
 end
 
 # ╔═╡ a435c976-de91-40a6-b536-9cf005027a3b
@@ -219,43 +325,9 @@ if size(df_star_by_inst,1)>0  # Warning: Assume exactly 2 instruments providing 
     t_plt = range(minimum(vcat(data1.t,data2.t)), stop=maximum(vcat(data1.t,data2.t)), step=1.0)
 end;
 
-# ╔═╡ 0b49db68-973a-42e0-8eed-4f4405b5f808
+# ╔═╡ acf3b224-3aa7-4419-92a1-fd2b1ee582ce
 md"""
-# Fitting a linear model
-"""
-
-# ╔═╡ 5a929ea7-93cc-4c4d-9340-734bcd509719
-md"""
-A star without any planet is expected to have linear radial velocity. We fit a linear model to our data and see if it is a good fit. Sometimes, if the data seems to be linear, it is a good idea to subract linear part to see the deviations.
-"""
-
-# ╔═╡ 2b35c01d-1bd1-4cdd-a9e6-5f61652bf36e
-md"""
-Residuals to the linear model are plotted below:
-"""
-
-# ╔═╡ d24fbe45-dc19-4946-9958-b3f26650d572
-init_li=[0,mean(data1.rv),mean(data2.rv)];
-
-# ╔═╡ 7e9f805c-80c4-472f-a3ea-f73a732b8a57
-md"""
-The loss function value with best fit parameters is:
-"""
-
-# ╔═╡ bb799c04-0e8c-4f02-a831-0acaa36d20c7
-md"""
-Number of observations:
-"""
-
-# ╔═╡ 62e93800-22bd-40a1-9ee6-bcd1134539ae
-md"""
-The expected distribution of loss and the loss value at mle are plotted in the following figure.
-"""
-
-# ╔═╡ 09020d68-05d3-4908-9dcc-c1e0097cd54c
-md"""
-If you want to subtract linear fitting results from the data, click the checkbox: $(@bind subtract_linear CheckBox()). \
-Warning: Only do this if the data looks to be linear and you want to investigate small deviations around the linear relationship. It is generally not suggested to subtract the linear fitting results.
+For reference, the RMS of RV measurement uncertainty is $(round(sqrt(mean(vcat(data1.σrv,data2.σrv).^2)),sigdigits=3) ) m/s
 """
 
 # ╔═╡ 963230d5-cef8-4a9c-aef4-319cbd75c207
@@ -270,21 +342,11 @@ begin
 end
 end
 
-# ╔═╡ e53d6766-4fb1-4bda-822e-9e468b440fdf
-md"""
-# Lomb-Scargle
-"""
+# ╔═╡ d24fbe45-dc19-4946-9958-b3f26650d572
+init_li=[0,mean(data1.rv),mean(data2.rv)];
 
-# ╔═╡ 3bc0583f-bfa6-49ce-9352-f5b504279ce3
-md"""
-Ground-based astronomical observations are very rarely evenly spaced.
-The corresponding method for unevenly sampled data would be the Lomb-Scargle periodogram or some generalizations(e.g., the maximum log likelihood as a function of orbital period or the marginal log a posteriori probability as a function of orbital period).
-"""
-
-# ╔═╡ 1ce61116-86e3-4488-b2ec-a0d7617bb4b3
-md"""
-Generate Periodogram with period upto $(@bind periodogram_range NumberField(0:1:500, default=200))% of observation period. 
-"""
+# ╔═╡ 49a9a26e-6423-47c3-91ca-785c2ccafe24
+inst_idx_per = findfirst(isequal(inst_per),map(k->instrument_label[k], df_star_by_inst[:,:inst]));
 
 # ╔═╡ 1121402e-69d9-4d3b-bec9-c4011e226675
 begin
@@ -292,45 +354,65 @@ begin
 	#t=df_star[(df_star[:,:Inst].=="k").||(df_star[:,:Inst].=="j"),:d]
 	#s=df_star[:,:RVel]
 	#t=df_star[:,:d]
-	t=data1.t
-	s=data1.rv
+	#t=cat(data1.t,data2.t,dims=1)
+	#s=cat(data1.rv,data2.rv,dims=1)
+	#pgram_list=[]
+	#maxPower_list=[]
+	#for i =1:length(inst_list)
+	#s=collect(df_star_by_inst[i,:rv])
+	#t=collect(df_star_by_inst[i,:bjd])
+	#D=maximum(t)-minimum(t) #Duration of observations
+	#plan = LombScargle.plan(t, s,minimum_frequency=1/(D*periodogram_range/100))
+	#pgram = lombscargle(plan)
+	#push!(pgram_list,pgram)
+	#push!(maxPower_list, LombScargle.findmaxpower(pgram))
+	#end
+	#id_pgram=1#findmax(maxPower_list)[2]
+	#pgram=pgram_list[id_pgram]
+	s=collect(df_star_by_inst[inst_idx_per,:rv])
+	t=collect(df_star_by_inst[inst_idx_per,:bjd])
 	D=maximum(t)-minimum(t) #Duration of observations
-	plan = LombScargle.plan(t, s,minimum_frequency=1/(D*periodogram_range/100))
+	plan = LombScargle.plan(t, s,minimum_frequency=1/(D*periodogram_range/100),normalization=:standard,oversampling=5)
 	pgram = lombscargle(plan)
-	plot(periodpower(pgram)...,label="Periodogram")
+	plot(periodpower(pgram)...,label="Periodogram",xaxis=:log)
 	fap=LombScargle.fapinv(pgram,0.0001)
 	fap2=LombScargle.fapinv(pgram,0.01)
 	hline!([fap],label="FAP=0.0001")
 	hline!([fap2],label="FAP=0.01")
+	title!("Periodogram")
+	xlabel!("Period(d)")
+	ylabel!("Power")
 end
-
-# ╔═╡ ec77269a-6cf8-420f-a7ef-75f15e30de28
-md"""
-Period with maximum power:
-"""
-
-# ╔═╡ b8ec7c40-5075-4cd9-89dd-b649e53d8558
-P0=LombScargle.findmaxperiod(pgram)
-
 
 # ╔═╡ b51622f7-baf7-4ab5-861e-dd7f5a707fdb
 if LombScargle.findmaxpower(pgram)<fap2
 	warning_box(md"There is no period with FAP<0.01. That is, there is no obvious periodic signal. Be cautious in the following analysis.")
 end
 
-# ╔═╡ 68a49dcb-3cd9-4905-abf6-d43083d256ce
-
-warning_box(md"
-periodiagram is not useful for planets with periods longer than the observation duration.
-")
-
-# ╔═╡ 59069f4e-58fa-458a-8c47-4176e3970f43
+# ╔═╡ ec77269a-6cf8-420f-a7ef-75f15e30de28
 md"""
-Radial velocity with respect to phase plot, using the period with maximum power provided by lomb-scargle periodogram. The RV value for diffrerent instruments are randomly separted.
+Period with maximum power is $((LombScargle.findmaxperiod(pgram))). If you want to see how reasonable this period is, check the Appendix for the RV-phase diagram plotted with the period given by the periodogram. 
+"""
+
+# ╔═╡ 70e8d18a-fa92-4993-8994-c9a481141e1d
+P0=LombScargle.findmaxperiod(pgram);
+
+# ╔═╡ f46cbed8-dec6-4bb2-8942-4fe96ebea3e4
+md"""
+Set initial values. The initial guess for P is determined by the periodogram by default.\
+P: $(@bind P_guess NumberField(1:0.0001:100000, default=P0[1]))
+
+
+
+h: $(@bind h_guess NumberField(0:0.01:2π, default=0.01))
+k: $(@bind k_guess NumberField(0:0.01:2π, default=0.01))
+σj: $(@bind σj_guess NumberField(0:0.05:2π, default=3.0))
 """
 
 # ╔═╡ 17b1760d-ed77-4773-8147-43245c70a962
+
 begin
+	
 	plt_phase_all = plot(widen=false)
 	num_inst = size(df_star_by_inst,1)
 	for inst in 1:num_inst
@@ -346,79 +428,22 @@ begin
 	#plot!(plt,t_plt,pred_1pl, label=:none)
 	xlabel!(plt_phase_all,"Phase")
 	ylabel!(plt_phase_all,"RV (m/s)")
-	title!(plt_phase_all,"HD " * star_name )
+	title!(plt_phase_all,"HD " * star_name *" with period from Periodogram" )
 	plt_phase_all
 end
 
-# ╔═╡ 3b21b28a-52f0-4da0-beba-bb09d666b9c6
-md"""
-# Fitting one planet model
-"""
-
-# ╔═╡ f46cbed8-dec6-4bb2-8942-4fe96ebea3e4
-md"""
-Set initial values. The initial guess for P is determined by the periodogram by default.\
-P: $(@bind P_guess NumberField(1:0.0001:100000, default=P0[1]))
-
-
-
-h: $(@bind h_guess NumberField(0:0.01:2π, default=0.01))
-k: $(@bind k_guess NumberField(0:0.01:2π, default=0.01))
-σj: $(@bind σj_guess NumberField(0:0.05:2π, default=3.0))
-"""
-
-# ╔═╡ 2384f27b-05d7-45f8-a18c-75bcdea14b80
-md"""
-The initial guesses are (P, K, h, k, M0-ω, C1, C2,σj):
-"""
-
-# ╔═╡ 6b5c4ec5-3b54-47e6-ad0b-d9a813b7bb7a
-md"""
-The results of model fitting are(P, K, h, k, M0-ω, C1, C2,σj):
-"""
-
-# ╔═╡ 69f83e46-8788-42ae-945d-3fb27b78a36f
-md"""
-RV data re-grouped by phasen is plotted below, using the period derived from the one planet keplerian model.
-"""
-
-# ╔═╡ 1d9f11ce-1515-4d75-9a30-55db3b3fa8ae
-md"""
-The constant-corrected RV observations used for the model fitting, together with the resulting model, are plotted below. 
-"""
-
-# ╔═╡ 8af96ff4-3c14-4667-9a31-d1aa22f927db
-md"""
-Residuals to the one planet model are plotted below.
-"""
-
-# ╔═╡ a494b98a-08df-464c-b3f4-584463f4210c
-md"""
-# Model Assessment
-"""
-
-# ╔═╡ d4eb252e-5d56-405d-9004-0cc0cbe05b98
-md"""
-Bootstrapping. Every time a sample does not converge, "Does not converge" will be printed in the following window.
-"""
-
-# ╔═╡ 173f7237-e446-4220-90ab-ab8d9cad8b64
-md"""
-Use bootstrap to estimate the distributions of orbit parameters.
-"""
-
-# ╔═╡ 7f720fc1-3004-41af-a570-46183ed4b646
-md"""
-The means and standard deviations of orbit parameters.
-"""
-
-# ╔═╡ 22ebdf59-a508-44f3-9db8-031b37c4446d
-md"""
-Consider the data points visited by bootstrap as training points, not visited ones as test points and perform cross-validation. Results are shown in the following figure.
-"""
-
-# ╔═╡ a40a805d-48a7-4451-b958-56ef041d3333
-warning_box(md"This fitting method does not perform well for orbits with extremely long periods (>10000days). Please be cautious.")
+# ╔═╡ 9e5a3e25-8f7a-469e-aa54-846beec8990f
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	res=vcat(resid1,resid2)
+	s_res=res
+	t_res=vcat(data1.t,data2.t)
+	D_res=maximum(t_res)-minimum(t_res) #Duration of observations
+	plan_res = LombScargle.plan(t_res, s_res,minimum_frequency=1/(D_res))
+	pgram_res = lombscargle(plan_res)
+end
+  ╠═╡ =#
 
 # ╔═╡ 769de9c4-6167-4550-be08-320c7c63fe3e
 md"""
@@ -457,7 +482,10 @@ begin
 end
 
 # ╔═╡ 59bc7b62-87f8-42bb-80d0-74d4cf2c9edf
-nobs=nobs1+nobs2
+begin
+nobs=nobs1+nobs2;
+nothing;
+end
 
 # ╔═╡ 5736df1b-a0c9-47b2-9cfe-faf01641ce26
 function predict_linear_model(A::AbstractMatrix, b::AbstractVector)
@@ -577,7 +605,7 @@ end
 function loss_li(θ)
 		(slope, C1,C2) = θ
 		
-		
+		C2=C1
 		rv_model1 = slope.*data1.t.+C1
 		loss =sum( (rv_model1.-data1.rv).^2 ./ data1.σrv.^2 )
 	if @isdefined inst_idx2	
@@ -589,6 +617,28 @@ function loss_li(θ)
 
 # ╔═╡ 75e5df52-18ab-4046-a2a0-fdaea68d9543
 result_li=Optim.optimize(loss_li, init_li, BFGS(), autodiff=:forward);
+
+# ╔═╡ 7e9f805c-80c4-472f-a3ea-f73a732b8a57
+md"""
+The loss function value with best-fit parameters is $(loss_li(result_li.minimizer)). The number of observations is $(nobs1+nobs2).
+"""
+
+# ╔═╡ 36e7d4ab-735e-4517-bf2e-ae1db69d227e
+loss_linear = loss_li(result_li.minimizer);
+
+# ╔═╡ d63c6ac8-3623-426e-b25f-668ffce47ddd
+let
+	expected_distribution = Chisq(nobs1+nobs2)
+	est_max_y = maximum(pdf.(expected_distribution,range(nobs1+nobs2/2,stop=1.5*(nobs1+nobs2),length=100)))
+
+	plt = plot(expected_distribution, xlabel="loss", ylabel="Probability", legend=:none)
+	plot!(plt,[loss_linear,loss_linear],[0,est_max_y], linestyle=:dot, linecolor=:black)
+end
+
+# ╔═╡ 44935b70-11a6-4804-a7cb-150d8660441b
+if loss_linear > nobs*5
+	warning_box(md"Linear model is probably not a good fit to the selected datasets.")
+end
 
 # ╔═╡ 3e653573-04db-4913-8771-2c23fe0e01a1
 begin
@@ -603,7 +653,7 @@ begin
 	plt_linear = plot(xlabel="Time (d)", ylabel="RV (m/s)", title="RV data with linear model")
 	scatter!(plt_linear, data1.t,data1.rv.-C1_li,yerr=data1.σrv, label=instrument_label[df_star_by_inst[inst_idx1 ,:inst]], markercolor=inst_idx1)
 	if @isdefined inst_idx2
-		scatter!(plt_linear, data2.t,data2.rv.-C2_li,yerr=data2.σrv, label=instrument_label[df_star_by_inst[inst_idx2 ,:inst]], markercolor=inst_idx2)
+		scatter!(plt_linear, data2.t,data2.rv.-C1_li,yerr=data2.σrv, label=instrument_label[df_star_by_inst[inst_idx2 ,:inst]], markercolor=inst_idx2)
 	
 	plot!([minimum([minimum(data2.t),minimum(data1.t)]),maximum([maximum(data2.t),maximum(data1.t)])],[slope_li*minimum([minimum(data2.t),minimum(data1.t)]),slope_li*maximum([maximum(data2.t),maximum(data1.t)])],label="Linear fit")
 	plt_linear
@@ -616,7 +666,7 @@ end
 # ╔═╡ 7f8751c3-b087-401e-a098-25460bf496d9
 begin
 	resid_li1=data1.rv.-C1_li-slope_li.*data1.t
-	resid_li2=data2.rv.-C2_li-slope_li.*data2.t
+	resid_li2=data2.rv.-C1_li-slope_li.*data2.t
 	
 	plt_resid_li = plot(legend=:none, widen=true)
 	scatter!(plt_resid_li,data1.t,
@@ -647,23 +697,6 @@ if subtract_linear
 	for i=1:length(data2.rv)
 		data2.rv[i]=data2.rv[i]-C2_li-slope_li*data2.t[i]
 	end
-end
-
-# ╔═╡ 36e7d4ab-735e-4517-bf2e-ae1db69d227e
-loss_linear = loss_li(result_li.minimizer)
-
-# ╔═╡ d63c6ac8-3623-426e-b25f-668ffce47ddd
-let
-	expected_distribution = Chisq(nobs1+nobs2)
-	est_max_y = maximum(pdf.(expected_distribution,range(nobs1+nobs2/2,stop=1.5*(nobs1+nobs2),length=100)))
-
-	plt = plot(expected_distribution, xlabel="loss", ylabel="Probability", legend=:none)
-	plot!(plt,[loss_linear,loss_linear],[0,est_max_y], linestyle=:dot, linecolor=:black)
-end
-
-# ╔═╡ 44935b70-11a6-4804-a7cb-150d8660441b
-if loss_linear > nobs*10
-	warning_box(md"Linear model is probably not a good fit to the selected datasets.")
 end
 
 # ╔═╡ 0372f0ee-b238-403e-b045-1ade617a271d
@@ -735,7 +768,7 @@ function find_best_1pl_fit(θinit::AbstractVector, loss::Function; num_init_phas
 		θinit_list[i,j][5] += (i-1)/num_init_phases * 2π - Δω
 		θinit_list[i,j][5] = mod(θinit_list[i,j][5],2π)
 		try
-			result_list[i,j] = Optim.optimize(loss, θinit_list[i,j], BFGS(), autodiff=:forward, Optim.Options(f_abstol=f_abstol));
+			result_list[i,j] = Optim.optimize(loss ,θinit_list[i,j], BFGS(), autodiff=:forward, Optim.Options(f_abstol=f_abstol));
 		catch
 			result_list[i,j] = (;minimum=Inf)
 		end
@@ -802,34 +835,12 @@ end
 
 # ╔═╡ 34fa0f41-fae2-4854-8055-d9ee476c3eef
 #=╠═╡
-	result = find_best_1pl_fit(init_guess, make_loss_1pl(data1,data2, t_mean=t_mean), num_init_phases = 1, num_init_ωs=4)
+	result = find_best_1pl_fit(init_guess, make_loss_1pl(data1,data2, t_mean=t_mean), num_init_phases = 1, num_init_ωs=4);
   ╠═╡ =#
 
 # ╔═╡ db3dca2a-86ed-4c6e-9477-175092eb538f
 #=╠═╡
 result.minimizer
-  ╠═╡ =#
-
-# ╔═╡ 34304691-cdd8-4cc0-a33e-e166c434eb4d
-#=╠═╡
-begin
-	plt_phase_all_after = plot(widen=false)
-	for inst in 1:num_inst
-		if length(df_star_by_inst[inst,:rv]) == 0 continue end
-		rvoffset = mean(df_star_by_inst[inst,:rv]) .- 30 .* (inst-2)
-		phase = mod.((df_star_by_inst[inst,:bjd].-t_offset)./result.minimizer[1],1.0)
-		scatter!(plt_phase_all_after,phase,
-				df_star_by_inst[inst,:rv].-rvoffset,
-				yerr=collect(df_star_by_inst[inst,:σrv]),
-				markersize=2, markerstrokewidth=0.5,
-				label=instrument_label[df_star_by_inst[inst,:inst]])
-	end
-	#plot!(plt,t_plt,pred_1pl, label=:none)
-	xlabel!(plt_phase_all_after,"Phase")
-	ylabel!(plt_phase_all_after,"RV (m/s)")
-	title!(plt_phase_all_after,"HD " * star_name )
-	plt_phase_all_after
-end
   ╠═╡ =#
 
 # ╔═╡ 255ce271-2011-4082-acaa-bfd4d972dc7b
@@ -865,6 +876,29 @@ let
 	scatter!(plt, data1.t,data1.rv.-rvoffset[inst_idx1],yerr=data1.σrv, label=instrument_label[df_star_by_inst[inst_idx1 ,:inst]], markercolor=inst_idx1)
 	plt
 end
+	
+end
+  ╠═╡ =#
+
+# ╔═╡ 34304691-cdd8-4cc0-a33e-e166c434eb4d
+#=╠═╡
+begin
+	plt_phase_all_after = plot(widen=false)
+	for inst in 1:num_inst
+		if length(df_star_by_inst[inst,:rv]) == 0 continue end
+		rvoffset = mean(df_star_by_inst[inst,:rv]) .- 30 .* (inst-2)
+		phase = mod.((df_star_by_inst[inst,:bjd].-t_offset)./result.minimizer[1],1.0)
+		scatter!(plt_phase_all_after,phase,
+				df_star_by_inst[inst,:rv].-rvoffset,
+				yerr=collect(df_star_by_inst[inst,:σrv]),
+				markersize=2, markerstrokewidth=0.5,
+				label=instrument_label[df_star_by_inst[inst,:inst]])
+	end
+	#plot!(plt,t_plt,pred_1pl, label=:none)
+	xlabel!(plt_phase_all_after,"Phase")
+	ylabel!(plt_phase_all_after,"RV (m/s)")
+	title!(plt_phase_all_after,"HD " * star_name * " with the fitted period." )
+	plt_phase_all_after
 end
   ╠═╡ =#
 
@@ -890,36 +924,55 @@ if @isdefined resid1
 	xlabel!(plt_resid,"Time (d)")
 	ylabel!(plt_resid,"RV (m/s)")
 
-	plt_resid_phase = plot(legend=:none, widen=false)
-	phase = mod.(data1.t ./ result.minimizer[1],1.0)
-	scatter!(plt_resid_phase,phase,
-				resid1,
-				yerr=data1.σrv, markercolor=inst_idx1)
+	#plt_resid_phase = plot(legend=:none, widen=false)
+	#phase = mod.(data1.t ./ result.minimizer[1],1.0)
+	#scatter!(plt_resid_phase,phase,
+				#resid1,
+				#yerr=data1.σrv, markercolor=inst_idx1)
 
 	if @isdefined inst_idx2
 	scatter!(plt_resid,data2.t,
 				resid2,
 				yerr=data2.σrv, markercolor=inst_idx2)
-	scatter!(plt_resid_phase,phase,
-				resid2,
-				yerr=data2.σrv, markercolor=inst_idx2)
+	#scatter!(plt_resid_phase,phase,
+				#resid2,
+				#yerr=data2.σrv, markercolor=inst_idx2)
 	end
-	xlabel!(plt_resid_phase,"Phase")
-	ylabel!(plt_resid_phase,"RV (m/s)")
+	#xlabel!(plt_resid_phase,"Phase")
+	#ylabel!(plt_resid_phase,"RV (m/s)")
 	title!(plt_resid,"HD " * star_name * " (residuals to 1 planet model)")
-	plot(plt_resid, plt_resid_phase, layout=(2,1) )
+	#plot(plt_resid, plt_resid_phase, layout=(2,1) )
+	plot(plt_resid)
+end
+  ╠═╡ =#
+
+# ╔═╡ e8222797-77df-40d2-b9bd-279ed3c12cde
+#=╠═╡
+md"""
+The mean measurement uncertainty is $(round(mean(vcat(data1.σrv,data2.σrv)),sigdigits=3)) m/s. The RMS RV residual is $(round(sqrt(mean(vcat(resid1,resid2).^2)),sigdigits=3)) m/s.
+"""
+  ╠═╡ =#
+
+# ╔═╡ 06eede8c-1dda-4a15-a69c-6019ee11269d
+#=╠═╡
+if sqrt(mean(vcat(resid1,resid2).^2))<2*mean(vcat(data1.σrv,data2.σrv)) 
+	correct("The model seems to be a good fit!")
+elseif  8*mean(vcat(data1.σrv,data2.σrv)) >sqrt(mean(vcat(resid1,resid2).^2)) > 2*mean(vcat(data1.σrv,data2.σrv)) 
+	warning_box(md"1 planet model is probably not a good fit to the selected datasets. Please check the fitting results. Please also check the residuals to see if there is another planet.")
+elseif 8*mean(vcat(data1.σrv,data2.σrv))<sqrt(mean(vcat(resid1,resid2).^2))
+	warning_box(md"1 planet model is not a good fit to the selected datasets. Please check the fitting results. Please also check the residuals to see if there is another planet.")
 end
   ╠═╡ =#
 
 # ╔═╡ 7d7fba67-c78a-44fe-bd9b-d8d4967b32c7
 #=╠═╡
-begin
-	num_bootstrap_samples=100
+if bootstrap.run
+	num_bootstrap_samples = bootstrap.num_bootstrap_samples
 results_bootstrap = Array{Any}(undef,num_bootstrap_samples)
 	rms_bootstrap = zeros(num_bootstrap_samples)
 	rms_bootstrap_train = zeros(num_bootstrap_samples)
 	testset_length = zeros(num_bootstrap_samples)
-	not_converge_flag=0
+	global not_converge_flag=0
 	not_converge_index=[]
 	for i = 1:num_bootstrap_samples
 		# Select sample of points to fit
@@ -928,8 +981,7 @@ results_bootstrap = Array{Any}(undef,num_bootstrap_samples)
 		# Create NamedTuple with view of resampled data
 		data_tmp1 = (;t=view(data1.t,idx1), rv=view(data1.rv,idx1), σrv=view(data1.σrv,idx1))
 		data_tmp2 = (;t=view(data2.t,idx2), rv=view(data2.rv,idx2), σrv=view(data2.σrv,idx2))
-		
-
+	
 		loss_tmp = make_loss_1pl(data_tmp1,data_tmp2, t_mean=t_mean)
 		# Attempt to find best-fit parameters results for resampled data
 		try 
@@ -949,10 +1001,10 @@ results_bootstrap = Array{Any}(undef,num_bootstrap_samples)
 			idx_train1 = filter(i->(i∈idx1), 1:length(data1.t))
 			idx_train2 = filter(i->(i∈idx2), 1:length(data2.t))
 			if length(idx_train1) == 0 continue end
-			pred_1pl1 = map(t->model_1pl(t,PKhkωMmω_to_PKeωM(results_bootstrap[i].minimizer[1:5])...,0.0, t_mean=t_mean),view(data1.t,idx_train1))
-			pred_1pl2 = map(t->model_1pl(t,PKhkωMmω_to_PKeωM(results_bootstrap[i].minimizer[1:5])...,0.0, t_mean=t_mean),view(data2.t,idx_train2))
-			resid1 = view(data1.rv,idx_train1).-results_bootstrap[i].minimizer[6]-pred_1pl1
-			resid2 = view(data2.rv,idx_train2).-results_bootstrap[i].minimizer[7]-pred_1pl2
+			local pred_1pl1 = map(t->model_1pl(t,PKhkωMmω_to_PKeωM(results_bootstrap[i].minimizer[1:5])...,0.0, t_mean=t_mean),view(data1.t,idx_train1))
+			local pred_1pl2 = map(t->model_1pl(t,PKhkωMmω_to_PKeωM(results_bootstrap[i].minimizer[1:5])...,0.0, t_mean=t_mean),view(data2.t,idx_train2))
+			local resid1 = view(data1.rv,idx_train1).-results_bootstrap[i].minimizer[6]-pred_1pl1
+			local resid2 = view(data2.rv,idx_train2).-results_bootstrap[i].minimizer[7]-pred_1pl2
 			resid=vcat(resid1,resid2)
 			rms_bootstrap_train[i] = sqrt(mean(resid.^2))
 				
@@ -960,10 +1012,10 @@ results_bootstrap = Array{Any}(undef,num_bootstrap_samples)
 			idx_test2 = filter(i->!(i∈idx2), 1:length(data2.t))
 			testset_length[i] = length(idx_test1)+length(idx_test2)
 			if testset_length[i] == 0 continue end
-			pred_1pl1 = map(t->model_1pl(t,PKhkωMmω_to_PKeωM(results_bootstrap[i].minimizer[1:5])...,0.0, t_mean=t_mean),view(data1.t,idx_test1))
-			pred_1pl2 = map(t->model_1pl(t,PKhkωMmω_to_PKeωM(results_bootstrap[i].minimizer[1:5])...,0.0, t_mean=t_mean),view(data2.t,idx_test2))
-			resid1 = view(data1.rv,idx_test1).-results_bootstrap[i].minimizer[6]-pred_1pl1
-			resid2 = view(data2.rv,idx_test2).-results_bootstrap[i].minimizer[7]-pred_1pl2
+			local pred_1pl1 = map(t->model_1pl(t,PKhkωMmω_to_PKeωM(results_bootstrap[i].minimizer[1:5])...,0.0, t_mean=t_mean),view(data1.t,idx_test1))
+			local pred_1pl2 = map(t->model_1pl(t,PKhkωMmω_to_PKeωM(results_bootstrap[i].minimizer[1:5])...,0.0, t_mean=t_mean),view(data2.t,idx_test2))
+			local resid1 = view(data1.rv,idx_test1).-results_bootstrap[i].minimizer[6]-pred_1pl1
+			local resid2 = view(data2.rv,idx_test2).-results_bootstrap[i].minimizer[7]-pred_1pl2
 			resid=vcat(resid1,resid2)
 			rms_bootstrap[i] = sqrt(mean(resid.^2))
 			
@@ -975,10 +1027,12 @@ results_bootstrap = Array{Any}(undef,num_bootstrap_samples)
 end
   ╠═╡ =#
 
-# ╔═╡ e30755c3-e701-4fd6-a244-6755ed6603d3
+# ╔═╡ 2d40a7b2-f650-45e0-978e-eca24954faa6
 #=╠═╡
-if not_converge_flag==1
-	warning_box(md"Several samples do not converge.")
+if @isdefined rms_bootstrap
+	plt_bootstrap_resid = plot(xlabel="RMS RV Residuals (m/s)", ylabel="Samples")
+	histogram!(plt_bootstrap_resid, rms_bootstrap, nbins=40, label="Test points", alpha=0.5)
+	histogram!(plt_bootstrap_resid, rms_bootstrap_train, nbins=40, label="Training points", alpha=0.5)
 end
   ╠═╡ =#
 
@@ -1030,7 +1084,7 @@ if @isdefined results_bootstrap
 	local C1sample = map(r->r.minimizer[6],results_bootstrap)
 	C1_mean_bootstrap = mean(C1sample)
 	C1_std_bootstrap = std(C1sample)
-	plt_C1_hist = plot(xlabel="C1", ylabel="Samples",xticks=
+	plt_C1_hist = plot(xlabel="C1 (m/s)", ylabel="Samples",xticks=
 	optimize_ticks(minimum(C1sample),maximum(C1sample),k_max=2)[1])
 	histogram!(plt_C1_hist,C1sample, label=:none, nbins=50)
 
@@ -1038,7 +1092,7 @@ if @isdefined results_bootstrap
 		local C2sample = map(r->r.minimizer[7],results_bootstrap)
 		C2_mean_bootstrap = mean(C2sample)
 		C2_std_bootstrap = std(C2sample)
-		plt_C2_hist = plot(xlabel="C2", ylabel="Samples",xticks=
+		plt_C2_hist = plot(xlabel="C2 (m/s)", ylabel="Samples",xticks=
 		optimize_ticks(minimum(C2sample),maximum(C2sample),k_max=2)[1])
 		histogram!(plt_C2_hist,C2sample, label=:none, nbins=50)
 	end
@@ -1046,7 +1100,7 @@ if @isdefined results_bootstrap
 	local σjsample = map(r->r.minimizer[8],results_bootstrap)
 	σj_mean_bootstrap = mean(σjsample)
 	σj_std_bootstrap = std(σjsample)
-	plt_σj_hist = plot(xlabel="σⱼ", ylabel="Samples",xticks=
+	plt_σj_hist = plot(xlabel="σⱼ (m/s)", ylabel="Samples",xticks=
 	optimize_ticks(minimum(σjsample),maximum(σjsample),k_max=3)[1])
 	histogram!(plt_σj_hist,σjsample, label=:none, nbins=50)
 	if @isdefined inst_idx2
@@ -1068,12 +1122,25 @@ if @isdefined bootstrap_results_df
 end
   ╠═╡ =#
 
-# ╔═╡ 2d40a7b2-f650-45e0-978e-eca24954faa6
+# ╔═╡ e30755c3-e701-4fd6-a244-6755ed6603d3
+#=╠═╡
+if @isdefined not_converge_flag
+	if not_converge_flag==1
+		warning_box(md"Several samples do not converge.")
+	end
+end
+  ╠═╡ =#
+
+# ╔═╡ 66446e92-0d84-4d2b-9804-a563fbd8e30b
+# ╠═╡ disabled = true
+# ╠═╡ skip_as_script = true
 #=╠═╡
 begin
-	plt_bootstrap_resid = plot(xlabel="RMS RV Residuals (m/s)", ylabel="Samples")
-	histogram!(plt_bootstrap_resid, rms_bootstrap, nbins=40, label="Test points", alpha=0.5)
-	histogram!(plt_bootstrap_resid, rms_bootstrap_train, nbins=40, label="Training points", alpha=0.5)
+	plt_1inst = plot(xlabel="Time (d)", ylabel="RV (m/s)", title="RVs from instrument being fit")
+	scatter!(plt_1inst, df_star_by_inst[inst_idx1,:bjd].-t_offset,df_star_by_inst[inst_idx1,:rv],yerr=df_star_by_inst[inst_idx1,:σrv], label=instrument_label[df_star_by_inst[inst_idx1 ,:inst]], markercolor=inst_idx1)
+	if @isdefined inst_idx2
+		scatter!(plt_1inst, df_star_by_inst[inst_idx2,:bjd].-t_offset,df_star_by_inst[inst_idx2,:rv],yerr=df_star_by_inst[inst_idx2,:σrv], label=instrument_label[df_star_by_inst[inst_idx2 ,:inst]], markercolor=inst_idx2)
+	end
 end
   ╠═╡ =#
 
@@ -1089,6 +1156,7 @@ LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LombScargle = "fc60dff9-86e7-5f2f-a8a0-edeadbb75bd9"
 MCMCChains = "c7f686f2-ff18-58e9-bc7b-31028e88f75d"
+MarkdownLiteral = "736d6165-7244-6769-4267-6b50796e6954"
 Optim = "429524aa-4258-5aef-a3af-852621145aeb"
 PDMats = "90014a1f-27ba-587c-ab20-58faa44d9150"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
@@ -1102,21 +1170,22 @@ Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 
 [compat]
 CSV = "~0.10.7"
-DataFrames = "~1.4.3"
-Distributions = "~0.25.77"
-ForwardDiff = "~0.10.33"
+DataFrames = "~1.4.4"
+Distributions = "~0.25.79"
+ForwardDiff = "~0.10.32"
 LaTeXStrings = "~1.3.0"
 LombScargle = "~1.0.3"
 MCMCChains = "~5.5.0"
-Optim = "~1.7.3"
+MarkdownLiteral = "~0.1.1"
+Optim = "~1.7.4"
 PDMats = "~0.11.16"
-Plots = "~1.36.1"
+Plots = "~1.37.1"
 PlutoTeachingTools = "~0.2.5"
-PlutoUI = "~0.7.48"
+PlutoUI = "~0.7.49"
 Query = "~1.0.0"
 StatsBase = "~0.33.21"
 StatsPlots = "~0.15.4"
-Turing = "~0.21.13"
+Turing = "~0.22.0"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -1253,9 +1322,9 @@ uuid = "76274a88-744f-5084-9051-94815aaf08c4"
 version = "0.10.6"
 
 [[deps.BitFlags]]
-git-tree-sha1 = "629c6e4a7be8f427d268cebef2a5e3de6c50d462"
+git-tree-sha1 = "43b1a4a8f797c1cddadf60499a8a077d4af2cd2d"
 uuid = "d1d4a3ce-64b1-5f1a-9ba4-7e7e69966f35"
-version = "0.1.6"
+version = "0.1.7"
 
 [[deps.Bzip2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1318,10 +1387,10 @@ uuid = "944b1d66-785c-5afd-91f1-9de20f533193"
 version = "0.7.0"
 
 [[deps.ColorSchemes]]
-deps = ["ColorTypes", "ColorVectorSpace", "Colors", "FixedPointNumbers", "Random"]
-git-tree-sha1 = "1fd869cc3875b57347f7027521f561cf46d1fcd8"
+deps = ["ColorTypes", "ColorVectorSpace", "Colors", "FixedPointNumbers", "Random", "SnoopPrecompile"]
+git-tree-sha1 = "aa3edc8f8dea6cbfa176ee12f7c2fc82f0608ed3"
 uuid = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
-version = "3.19.0"
+version = "3.20.0"
 
 [[deps.ColorTypes]]
 deps = ["FixedPointNumbers", "Random"]
@@ -1346,6 +1415,12 @@ git-tree-sha1 = "08c8b6831dc00bfea825826be0bc8336fc369860"
 uuid = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
 version = "1.0.2"
 
+[[deps.CommonMark]]
+deps = ["Crayons", "JSON", "URIs"]
+git-tree-sha1 = "86cce6fd164c26bad346cc51ca736e692c9f553c"
+uuid = "a80b9123-70ca-4bc0-993e-6e3bcb318db6"
+version = "0.8.7"
+
 [[deps.CommonSolve]]
 git-tree-sha1 = "9441451ee712d1aec22edad62db1a9af3dc8d852"
 uuid = "38540f10-b2f7-11e9-35d8-d573e4eb0ff2"
@@ -1359,9 +1434,9 @@ version = "0.3.0"
 
 [[deps.Compat]]
 deps = ["Dates", "LinearAlgebra", "UUIDs"]
-git-tree-sha1 = "3ca828fe1b75fa84b021a7860bd039eaea84d2f2"
+git-tree-sha1 = "00a2cccc7f098ff3b66806862d275ca3db9e6e5a"
 uuid = "34da2185-b29b-5c13-b0c7-acf172513d20"
-version = "4.3.0"
+version = "4.5.0"
 
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -1401,9 +1476,9 @@ version = "1.13.0"
 
 [[deps.DataFrames]]
 deps = ["Compat", "DataAPI", "Future", "InvertedIndices", "IteratorInterfaceExtensions", "LinearAlgebra", "Markdown", "Missings", "PooledArrays", "PrettyTables", "Printf", "REPL", "Random", "Reexport", "SnoopPrecompile", "SortingAlgorithms", "Statistics", "TableTraits", "Tables", "Unicode"]
-git-tree-sha1 = "0f44494fe4271cc966ac4fea524111bef63ba86c"
+git-tree-sha1 = "d4f69885afa5e6149d0cab3818491565cf41446d"
 uuid = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
-version = "1.4.3"
+version = "1.4.4"
 
 [[deps.DataStructures]]
 deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
@@ -1465,9 +1540,9 @@ uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 
 [[deps.Distributions]]
 deps = ["ChainRulesCore", "DensityInterface", "FillArrays", "LinearAlgebra", "PDMats", "Printf", "QuadGK", "Random", "SparseArrays", "SpecialFunctions", "Statistics", "StatsBase", "StatsFuns", "Test"]
-git-tree-sha1 = "bee795cdeabc7601776abbd6b9aac2ca62429966"
+git-tree-sha1 = "a7756d098cbabec6b3ac44f369f74915e8cfd70a"
 uuid = "31c24e10-a181-5473-b8eb-7969acd0382f"
-version = "0.25.77"
+version = "0.25.79"
 
 [[deps.DistributionsAD]]
 deps = ["Adapt", "ChainRules", "ChainRulesCore", "Compat", "DiffRules", "Distributions", "FillArrays", "LinearAlgebra", "NaNMath", "PDMats", "Random", "Requires", "SpecialFunctions", "StaticArrays", "StatsBase", "StatsFuns", "ZygoteRules"]
@@ -1493,9 +1568,9 @@ version = "0.6.8"
 
 [[deps.DynamicPPL]]
 deps = ["AbstractMCMC", "AbstractPPL", "BangBang", "Bijectors", "ChainRulesCore", "ConstructionBase", "Distributions", "DocStringExtensions", "LinearAlgebra", "MacroTools", "OrderedCollections", "Random", "Setfield", "Test", "ZygoteRules"]
-git-tree-sha1 = "7bc3920ba1e577ad3d7ebac75602ab42b557e28e"
+git-tree-sha1 = "9a795bb2fe860e2b0a19136429a173de9f8c2774"
 uuid = "366bfd00-2699-11ea-058f-f148b4cae6d8"
-version = "0.20.2"
+version = "0.21.3"
 
 [[deps.EllipticalSliceSampling]]
 deps = ["AbstractMCMC", "ArrayInterfaceCore", "Distributions", "Random", "Statistics"]
@@ -1504,9 +1579,9 @@ uuid = "cad2338a-1db2-11e9-3401-43bc07c9ede2"
 version = "1.0.0"
 
 [[deps.EnumX]]
-git-tree-sha1 = "e5333cd1e1c713ee21d07b6ed8b0d8853fabe650"
+git-tree-sha1 = "bdb1942cd4c45e3c678fd11569d5cccd80976237"
 uuid = "4e289a0a-7415-4d19-859d-a7e5c4648b56"
-version = "1.0.3"
+version = "1.0.4"
 
 [[deps.Expat_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1560,9 +1635,9 @@ version = "0.13.5"
 
 [[deps.FiniteDiff]]
 deps = ["ArrayInterfaceCore", "LinearAlgebra", "Requires", "Setfield", "SparseArrays", "StaticArrays"]
-git-tree-sha1 = "bb61d9e5085784fe453f70c97b23964c5bf36942"
+git-tree-sha1 = "04ed1f0029b6b3af88343e439b995141cb0d0b8d"
 uuid = "6a86dc24-6348-571c-b903-95158fe2bd41"
-version = "2.16.0"
+version = "2.17.0"
 
 [[deps.FixedPointNumbers]]
 deps = ["Statistics"]
@@ -1584,9 +1659,9 @@ version = "0.4.2"
 
 [[deps.ForwardDiff]]
 deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "LinearAlgebra", "LogExpFunctions", "NaNMath", "Preferences", "Printf", "Random", "SpecialFunctions", "StaticArrays"]
-git-tree-sha1 = "10fa12fe96e4d76acfa738f4df2126589a67374f"
+git-tree-sha1 = "187198a4ed8ccd7b5d99c41b69c679269ea2b2d4"
 uuid = "f6369f11-7733-5829-9624-2563aa707210"
-version = "0.10.33"
+version = "0.10.32"
 
 [[deps.FreeType2_jll]]
 deps = ["Artifacts", "Bzip2_jll", "JLLWrappers", "Libdl", "Pkg", "Zlib_jll"]
@@ -1634,16 +1709,16 @@ uuid = "46192b85-c4d5-4398-a991-12ede77f4527"
 version = "0.1.2"
 
 [[deps.GR]]
-deps = ["Base64", "DelimitedFiles", "GR_jll", "HTTP", "JSON", "Libdl", "LinearAlgebra", "Pkg", "Preferences", "Printf", "Random", "Serialization", "Sockets", "Test", "UUIDs"]
-git-tree-sha1 = "00a9d4abadc05b9476e937a5557fcce476b9e547"
+deps = ["Artifacts", "Base64", "DelimitedFiles", "Downloads", "GR_jll", "HTTP", "JSON", "Libdl", "LinearAlgebra", "Pkg", "Preferences", "Printf", "Random", "Serialization", "Sockets", "TOML", "Tar", "Test", "UUIDs", "p7zip_jll"]
+git-tree-sha1 = "051072ff2accc6e0e87b708ddee39b18aa04a0bc"
 uuid = "28b8d3ca-fb5f-59d9-8090-bfdbd6d07a71"
-version = "0.69.5"
+version = "0.71.1"
 
 [[deps.GR_jll]]
 deps = ["Artifacts", "Bzip2_jll", "Cairo_jll", "FFMPEG_jll", "Fontconfig_jll", "GLFW_jll", "JLLWrappers", "JpegTurbo_jll", "Libdl", "Libtiff_jll", "Pixman_jll", "Pkg", "Qt5Base_jll", "Zlib_jll", "libpng_jll"]
-git-tree-sha1 = "bc9f7725571ddb4ab2c4bc74fa397c1c5ad08943"
+git-tree-sha1 = "501a4bf76fd679e7fcd678725d5072177392e756"
 uuid = "d2c73de3-f751-5644-a686-071e5b155ba9"
-version = "0.69.1+0"
+version = "0.71.1+0"
 
 [[deps.Gettext_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Libiconv_jll", "Pkg", "XML2_jll"]
@@ -1670,9 +1745,9 @@ version = "1.0.2"
 
 [[deps.HTTP]]
 deps = ["Base64", "CodecZlib", "Dates", "IniFile", "Logging", "LoggingExtras", "MbedTLS", "NetworkOptions", "OpenSSL", "Random", "SimpleBufferStream", "Sockets", "URIs", "UUIDs"]
-git-tree-sha1 = "8c7e6b82abd41364b8ffe40ffc63b33e590c8722"
+git-tree-sha1 = "e1acc37ed078d99a714ed8376446f92a5535ca65"
 uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
-version = "1.5.3"
+version = "1.5.5"
 
 [[deps.HarfBuzz_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "Graphite2_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg"]
@@ -1716,9 +1791,9 @@ version = "0.3.1"
 
 [[deps.InlineStrings]]
 deps = ["Parsers"]
-git-tree-sha1 = "b5081bd8a53eeb6a2ef956751343ab44543023fb"
+git-tree-sha1 = "0cf92ec945125946352f3d46c96976ab972bde6f"
 uuid = "842dd82b-1e85-43dc-bf29-5d0ee9dffc48"
-version = "1.3.1"
+version = "1.3.2"
 
 [[deps.InplaceOps]]
 deps = ["LinearAlgebra", "Test"]
@@ -1744,9 +1819,9 @@ version = "0.14.6"
 
 [[deps.IntervalSets]]
 deps = ["Dates", "Random", "Statistics"]
-git-tree-sha1 = "3f91cd3f56ea48d4d2a75c2a65455c5fc74fa347"
+git-tree-sha1 = "16c0cc91853084cb5f58a78bd209513900206ce6"
 uuid = "8197267c-284f-5f27-9208-e0e47529a953"
-version = "0.7.3"
+version = "0.7.4"
 
 [[deps.InverseFunctions]]
 deps = ["Test"]
@@ -1755,9 +1830,9 @@ uuid = "3587e190-3f89-42d0-90ee-14403ec27112"
 version = "0.1.8"
 
 [[deps.InvertedIndices]]
-git-tree-sha1 = "bee5f1ef5bf65df56bdd2e40447590b272a5471f"
+git-tree-sha1 = "82aec7a3dd64f4d9584659dc0b62ef7db2ef3e19"
 uuid = "41ab1584-1d38-5bbf-9106-f11c6c58b48f"
-version = "1.1.0"
+version = "1.2.0"
 
 [[deps.IrrationalConstants]]
 git-tree-sha1 = "7fd44fd4ff43fc60815f8e764c0f352b83c49151"
@@ -1806,9 +1881,9 @@ version = "2.1.2+0"
 
 [[deps.JuliaInterpreter]]
 deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
-git-tree-sha1 = "0f960b1404abb0b244c1ece579a0ec78d056a5d1"
+git-tree-sha1 = "a79c4cf60cc7ddcdcc70acbb7216a5f9b4f8d188"
 uuid = "aa1ae85d-cabe-5617-a682-6adf51b2e16a"
-version = "0.9.15"
+version = "0.9.16"
 
 [[deps.KernelDensity]]
 deps = ["Distributions", "DocStringExtensions", "FFTW", "Interpolations", "StatsBase"]
@@ -1893,9 +1968,9 @@ version = "1.8.7+0"
 
 [[deps.Libglvnd_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Xorg_libX11_jll", "Xorg_libXext_jll"]
-git-tree-sha1 = "7739f837d6447403596a75d19ed01fd08d6f56bf"
+git-tree-sha1 = "6f73d1dd803986947b2c750138528a999a6c7733"
 uuid = "7e76a0d4-f3c7-5321-8279-8d96eeed0f29"
-version = "1.3.0+3"
+version = "1.6.0+0"
 
 [[deps.Libgpg_error_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1945,15 +2020,15 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[deps.LogDensityProblems]]
 deps = ["ArgCheck", "DocStringExtensions", "Random", "Requires", "UnPack"]
-git-tree-sha1 = "408a29d70f8032b50b22155e6d7776715144b761"
+git-tree-sha1 = "c3e1189191e4528b605070972d7d4e9cd91dd96b"
 uuid = "6fdf6af0-433a-55f7-b3ed-c6c6e0b8df7c"
-version = "1.0.2"
+version = "1.0.3"
 
 [[deps.LogExpFunctions]]
 deps = ["ChainRulesCore", "ChangesOfVariables", "DocStringExtensions", "InverseFunctions", "IrrationalConstants", "LinearAlgebra"]
-git-tree-sha1 = "94d9c52ca447e23eac0c0f074effbcd38830deb5"
+git-tree-sha1 = "946607f84feb96220f480e0422d3484c49c00239"
 uuid = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
-version = "0.3.18"
+version = "0.3.19"
 
 [[deps.Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
@@ -2001,9 +2076,9 @@ version = "2022.2.0+0"
 
 [[deps.MLJModelInterface]]
 deps = ["Random", "ScientificTypesBase", "StatisticalTraits"]
-git-tree-sha1 = "4040c0da2bd05130687cc258c1318acd32bace90"
+git-tree-sha1 = "c8b7e632d6754a5e36c0d94a4b466a5ba3a30128"
 uuid = "e80e1ace-859a-464e-9ed9-23947d8ae3ea"
-version = "1.7.1"
+version = "1.8.0"
 
 [[deps.MacroTools]]
 deps = ["Markdown", "Random"]
@@ -2019,6 +2094,12 @@ version = "0.4.1"
 [[deps.Markdown]]
 deps = ["Base64"]
 uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
+
+[[deps.MarkdownLiteral]]
+deps = ["CommonMark", "HypertextLiteral"]
+git-tree-sha1 = "0d3fa2dd374934b62ee16a4721fe68c418b92899"
+uuid = "736d6165-7244-6769-4267-6b50796e6954"
+version = "0.1.1"
 
 [[deps.MbedTLS]]
 deps = ["Dates", "MbedTLS_jll", "MozillaCACerts_jll", "Random", "Sockets"]
@@ -2067,15 +2148,15 @@ version = "0.10.0"
 
 [[deps.NLSolversBase]]
 deps = ["DiffResults", "Distributed", "FiniteDiff", "ForwardDiff"]
-git-tree-sha1 = "50310f934e55e5ca3912fb941dec199b49ca9b68"
+git-tree-sha1 = "a0b464d183da839699f4c79e7606d9d186ec172c"
 uuid = "d41bc354-129a-5804-8e4c-c37616107c6c"
-version = "7.8.2"
+version = "7.8.3"
 
 [[deps.NNlib]]
 deps = ["Adapt", "ChainRulesCore", "LinearAlgebra", "Pkg", "Requires", "Statistics"]
-git-tree-sha1 = "00bcfcea7b2063807fdcab2e0ce86ef00b8b8000"
+git-tree-sha1 = "37596c26f107f2fd93818166ed3dab1a2e6b2f05"
 uuid = "872c559c-99b0-510c-b3b7-b6c96a88d5cd"
-version = "0.8.10"
+version = "0.8.11"
 
 [[deps.NaNMath]]
 deps = ["OpenLibm_jll"]
@@ -2130,9 +2211,9 @@ uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
 
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
-git-tree-sha1 = "5628f092c6186a80484bfefdf89ff64efdaec552"
+git-tree-sha1 = "df6830e37943c7aaa10023471ca47fb3065cc3c4"
 uuid = "4d8831e6-92b7-49fb-bdf8-b643e874388c"
-version = "1.3.1"
+version = "1.3.2"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -2148,15 +2229,15 @@ version = "0.5.5+0"
 
 [[deps.Optim]]
 deps = ["Compat", "FillArrays", "ForwardDiff", "LineSearches", "LinearAlgebra", "NLSolversBase", "NaNMath", "Parameters", "PositiveFactorizations", "Printf", "SparseArrays", "StatsBase"]
-git-tree-sha1 = "b9fe76d1a39807fdcf790b991981a922de0c3050"
+git-tree-sha1 = "1903afc76b7d01719d9c30d3c7d501b61db96721"
 uuid = "429524aa-4258-5aef-a3af-852621145aeb"
-version = "1.7.3"
+version = "1.7.4"
 
 [[deps.Optimisers]]
 deps = ["ChainRulesCore", "Functors", "LinearAlgebra", "Random", "Statistics"]
-git-tree-sha1 = "8a9102cb805df46fc3d6effdc2917f09b0215c0b"
+git-tree-sha1 = "f1cccb9f879dd4eaa4d92b115ab793545965d763"
 uuid = "3bd65402-5787-11e9-1adc-39752487f4e2"
-version = "0.2.10"
+version = "0.2.13"
 
 [[deps.Opus_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -2187,9 +2268,9 @@ version = "0.12.3"
 
 [[deps.Parsers]]
 deps = ["Dates", "SnoopPrecompile"]
-git-tree-sha1 = "cceb0257b662528ecdf0b4b4302eb00e767b38e7"
+git-tree-sha1 = "b64719e8b4504983c7fca6cc9db3ebc8acc2a4d6"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "2.5.0"
+version = "2.5.1"
 
 [[deps.Pipe]]
 git-tree-sha1 = "6842804e7867b115ca9de748a0cf6b364523c16d"
@@ -2214,15 +2295,15 @@ version = "3.1.0"
 
 [[deps.PlotUtils]]
 deps = ["ColorSchemes", "Colors", "Dates", "Printf", "Random", "Reexport", "SnoopPrecompile", "Statistics"]
-git-tree-sha1 = "21303256d239f6b484977314674aef4bb1fe4420"
+git-tree-sha1 = "5b7690dd212e026bbab1860016a6601cb077ab66"
 uuid = "995b91a9-d308-5afd-9ec6-746e21dbc043"
-version = "1.3.1"
+version = "1.3.2"
 
 [[deps.Plots]]
-deps = ["Base64", "Contour", "Dates", "Downloads", "FFMPEG", "FixedPointNumbers", "GR", "JLFzf", "JSON", "LaTeXStrings", "Latexify", "LinearAlgebra", "Measures", "NaNMath", "Pkg", "PlotThemes", "PlotUtils", "Printf", "REPL", "Random", "RecipesBase", "RecipesPipeline", "Reexport", "RelocatableFolders", "Requires", "Scratch", "Showoff", "SnoopPrecompile", "SparseArrays", "Statistics", "StatsBase", "UUIDs", "UnicodeFun", "Unzip"]
-git-tree-sha1 = "47e70b391ff314cc36e7c2400f7d2c5455dc9496"
+deps = ["Base64", "Contour", "Dates", "Downloads", "FFMPEG", "FixedPointNumbers", "GR", "JLFzf", "JSON", "LaTeXStrings", "Latexify", "LinearAlgebra", "Measures", "NaNMath", "Pkg", "PlotThemes", "PlotUtils", "Preferences", "Printf", "REPL", "Random", "RecipesBase", "RecipesPipeline", "Reexport", "RelocatableFolders", "Requires", "Scratch", "Showoff", "SnoopPrecompile", "SparseArrays", "Statistics", "StatsBase", "UUIDs", "UnicodeFun", "Unzip"]
+git-tree-sha1 = "5a554627361326403e2bb2db717ada24ae6cefbc"
 uuid = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
-version = "1.36.1"
+version = "1.37.1"
 
 [[deps.PlutoHooks]]
 deps = ["InteractiveUtils", "Markdown", "UUIDs"]
@@ -2244,9 +2325,9 @@ version = "0.2.5"
 
 [[deps.PlutoUI]]
 deps = ["AbstractPlutoDingetjes", "Base64", "ColorTypes", "Dates", "FixedPointNumbers", "Hyperscript", "HypertextLiteral", "IOCapture", "InteractiveUtils", "JSON", "Logging", "MIMEs", "Markdown", "Random", "Reexport", "URIs", "UUIDs"]
-git-tree-sha1 = "efc140104e6d0ae3e7e30d56c98c4a927154d684"
+git-tree-sha1 = "eadad7b14cf046de6eb41f13c9275e5aa2711ab6"
 uuid = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
-version = "0.7.48"
+version = "0.7.49"
 
 [[deps.PooledArrays]]
 deps = ["DataAPI", "Future"]
@@ -2268,9 +2349,9 @@ version = "1.3.0"
 
 [[deps.PrettyTables]]
 deps = ["Crayons", "Formatting", "LaTeXStrings", "Markdown", "Reexport", "StringManipulation", "Tables"]
-git-tree-sha1 = "d8ed354439950b34ab04ff8f3dfd49e11bc6c94b"
+git-tree-sha1 = "96f6db03ab535bdb901300f88335257b0018689d"
 uuid = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
-version = "2.2.1"
+version = "2.2.2"
 
 [[deps.Printf]]
 deps = ["Unicode"]
@@ -2339,21 +2420,21 @@ version = "0.1.0"
 
 [[deps.RecipesBase]]
 deps = ["SnoopPrecompile"]
-git-tree-sha1 = "d12e612bba40d189cead6ff857ddb67bd2e6a387"
+git-tree-sha1 = "18c35ed630d7229c5584b945641a73ca83fb5213"
 uuid = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
-version = "1.3.1"
+version = "1.3.2"
 
 [[deps.RecipesPipeline]]
 deps = ["Dates", "NaNMath", "PlotUtils", "RecipesBase", "SnoopPrecompile"]
-git-tree-sha1 = "a030182cccc5c461386c6f055c36ab8449ef1340"
+git-tree-sha1 = "e974477be88cb5e3040009f3767611bc6357846f"
 uuid = "01d81517-befc-4cb6-b9ec-a95719d0359c"
-version = "0.6.10"
+version = "0.6.11"
 
 [[deps.RecursiveArrayTools]]
 deps = ["Adapt", "ArrayInterfaceCore", "ArrayInterfaceStaticArraysCore", "ChainRulesCore", "DocStringExtensions", "FillArrays", "GPUArraysCore", "IteratorInterfaceExtensions", "LinearAlgebra", "RecipesBase", "StaticArraysCore", "Statistics", "Tables", "ZygoteRules"]
-git-tree-sha1 = "fe25988dce8dd3b763cf39d0ca39b09db3571ff7"
+git-tree-sha1 = "a5ce741acddc02f0d4fc6505463ca89697d7fb23"
 uuid = "731186ca-8d62-57ce-b412-fbd966d074cd"
-version = "2.32.1"
+version = "2.32.3"
 
 [[deps.Reexport]]
 git-tree-sha1 = "45e428421666073eab6f2da5c9d310d99bb12f9b"
@@ -2407,9 +2488,9 @@ uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 
 [[deps.SciMLBase]]
 deps = ["ArrayInterfaceCore", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "Preferences", "RecipesBase", "RecursiveArrayTools", "RuntimeGeneratedFunctions", "StaticArraysCore", "Statistics", "Tables"]
-git-tree-sha1 = "5686a5c9660c5fb571e3a8be63ff1848de82bdbd"
+git-tree-sha1 = "6a5c8e335e82b0c674bf74f7b45f005175b0cc5f"
 uuid = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
-version = "1.71.0"
+version = "1.77.0"
 
 [[deps.ScientificTypesBase]]
 git-tree-sha1 = "a8e18eb383b5ecf1b5e6fc237eb39255044fd92b"
@@ -2462,9 +2543,9 @@ uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
 
 [[deps.SortingAlgorithms]]
 deps = ["DataStructures"]
-git-tree-sha1 = "b3363d7460f7d098ca0912c69b082f75625d7508"
+git-tree-sha1 = "a4ada03f999bd01b3a25dcaa30b2d929fe537e00"
 uuid = "a2af1166-a08f-5f64-846c-94a0d3cef48c"
-version = "1.0.1"
+version = "1.1.0"
 
 [[deps.SparseArrays]]
 deps = ["LinearAlgebra", "Random"]
@@ -2484,9 +2565,9 @@ version = "0.1.15"
 
 [[deps.StaticArrays]]
 deps = ["LinearAlgebra", "Random", "StaticArraysCore", "Statistics"]
-git-tree-sha1 = "f86b3a049e5d05227b10e15dbb315c5b90f14988"
+git-tree-sha1 = "ffc098086f35909741f71ce21d03dadf0d2bfa76"
 uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "1.5.9"
+version = "1.5.11"
 
 [[deps.StaticArraysCore]]
 git-tree-sha1 = "6b7ba252635a5eff6a0b0664a41ee140a1c9e72a"
@@ -2517,9 +2598,9 @@ version = "0.33.21"
 
 [[deps.StatsFuns]]
 deps = ["ChainRulesCore", "HypergeometricFunctions", "InverseFunctions", "IrrationalConstants", "LogExpFunctions", "Reexport", "Rmath", "SpecialFunctions"]
-git-tree-sha1 = "5783b877201a82fc0014cbf381e7e6eb130473a4"
+git-tree-sha1 = "ab6083f09b3e617e34a956b43e9d51b824206932"
 uuid = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
-version = "1.0.1"
+version = "1.1.1"
 
 [[deps.StatsPlots]]
 deps = ["AbstractFFTs", "Clustering", "DataStructures", "DataValues", "Distributions", "Interpolations", "KernelDensity", "LinearAlgebra", "MultivariateStats", "NaNMath", "Observables", "Plots", "RecipesBase", "RecipesPipeline", "Reexport", "StatsBase", "TableOperations", "Tables", "Widgets"]
@@ -2604,15 +2685,15 @@ version = "0.2.22"
 
 [[deps.TranscodingStreams]]
 deps = ["Random", "Test"]
-git-tree-sha1 = "8a75929dcd3c38611db2f8d08546decb514fcadf"
+git-tree-sha1 = "e4bdc63f5c6d62e80eb1c0043fcc0360d5950ff7"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
-version = "0.9.9"
+version = "0.9.10"
 
 [[deps.Transducers]]
 deps = ["Adapt", "ArgCheck", "BangBang", "Baselet", "CompositionsBase", "DefineSingletons", "Distributed", "InitialValues", "Logging", "Markdown", "MicroCollections", "Requires", "Setfield", "SplittablesBase", "Tables"]
-git-tree-sha1 = "77fea79baa5b22aeda896a8d9c6445a74500a2c2"
+git-tree-sha1 = "c42fa452a60f022e9e087823b47e5a5f8adc53d5"
 uuid = "28d57a85-8fef-5791-bfe6-a80928e7c999"
-version = "0.4.74"
+version = "0.4.75"
 
 [[deps.Tricks]]
 git-tree-sha1 = "6bac775f2d42a611cdfcd1fb217ee719630c4175"
@@ -2620,15 +2701,15 @@ uuid = "410a4b4d-49e4-4fbc-ab6d-cb71b17b3775"
 version = "0.1.6"
 
 [[deps.Turing]]
-deps = ["AbstractMCMC", "AdvancedHMC", "AdvancedMH", "AdvancedPS", "AdvancedVI", "BangBang", "Bijectors", "DataStructures", "Distributions", "DistributionsAD", "DocStringExtensions", "DynamicPPL", "EllipticalSliceSampling", "ForwardDiff", "Libtask", "LinearAlgebra", "LogDensityProblems", "MCMCChains", "NamedArrays", "Printf", "Random", "Reexport", "Requires", "SciMLBase", "SpecialFunctions", "Statistics", "StatsBase", "StatsFuns", "Tracker"]
-git-tree-sha1 = "631fdfe9720d8c2e2a885b1580c8f8c18347b5da"
+deps = ["AbstractMCMC", "AdvancedHMC", "AdvancedMH", "AdvancedPS", "AdvancedVI", "BangBang", "Bijectors", "DataStructures", "Distributions", "DistributionsAD", "DocStringExtensions", "DynamicPPL", "EllipticalSliceSampling", "ForwardDiff", "Libtask", "LinearAlgebra", "LogDensityProblems", "MCMCChains", "NamedArrays", "Printf", "Random", "Reexport", "Requires", "SciMLBase", "Setfield", "SpecialFunctions", "Statistics", "StatsBase", "StatsFuns", "Tracker"]
+git-tree-sha1 = "8a40377bcc4b054ebdc8f680e96cd73a4a6fe2e6"
 uuid = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
-version = "0.21.13"
+version = "0.22.0"
 
 [[deps.URIs]]
-git-tree-sha1 = "e59ecc5a41b000fa94423a578d29290c7266fc10"
+git-tree-sha1 = "ac00576f90d8a259f2c9d823e91d1de3fd44d348"
 uuid = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
-version = "1.4.0"
+version = "1.4.1"
 
 [[deps.UUIDs]]
 deps = ["Random", "SHA"]
@@ -2906,83 +2987,85 @@ version = "1.4.1+0"
 
 # ╔═╡ Cell order:
 # ╟─f53f1d9f-8be8-4dcc-a637-f39b1eaacd63
-# ╟─8cf8e22c-af0f-422b-89a1-109291cd749a
 # ╟─6d090107-d691-4a68-91ad-c7dae5df35ad
+# ╟─8cf8e22c-af0f-422b-89a1-109291cd749a
 # ╟─8f829f16-553a-11ed-3fd9-9f77ddd265d5
 # ╟─a6eedc20-0171-48c7-938f-daee0ce4f8e9
-# ╟─519b083c-aa8d-48da-b9ec-6e3cddf94d99
-# ╟─f3bbb76c-14cd-4566-935b-5c1f6949eaf5
-# ╟─2350b4a6-a538-430e-b832-4ecb4a458c4d
-# ╟─2de85bb1-881f-483a-bcdb-2109ed795ec5
-# ╟─bfc1affc-b392-4884-a35f-55593af7db53
 # ╟─e71bdd5e-a50e-46b2-8249-55ad7dffb789
 # ╟─4a949edb-8737-4439-a1c0-14641bd99f8c
 # ╟─6f000c6d-14a8-4d6d-97f8-d01f4dd516bc
 # ╟─e4084b5c-19de-460d-aceb-ee6f3cfafbd9
 # ╟─e3b46289-f602-4dee-81cc-91c8466dcd5a
-# ╟─8f239f05-2610-42ce-92c6-968943418328
 # ╟─64987161-afde-4b4d-93a8-19f7b40aeae7
 # ╟─383d9191-fc82-4f9c-81f5-837a67c71e9b
 # ╟─10290d00-c667-46f3-a03e-8fb33842448a
-# ╟─32a6f1f8-c213-40c1-a6c1-5dc7ce87976e
-# ╟─66446e92-0d84-4d2b-9804-a563fbd8e30b
-# ╟─a435c976-de91-40a6-b536-9cf005027a3b
 # ╟─0b49db68-973a-42e0-8eed-4f4405b5f808
 # ╟─5a929ea7-93cc-4c4d-9340-734bcd509719
-# ╟─640c9851-73ba-47ed-84e4-6484f3b793b2
 # ╟─b5fc8991-ae2d-4db4-a7f9-5da11a21e094
-# ╟─2b35c01d-1bd1-4cdd-a9e6-5f61652bf36e
 # ╟─7f8751c3-b087-401e-a098-25460bf496d9
-# ╟─d24fbe45-dc19-4946-9958-b3f26650d572
-# ╟─75e5df52-18ab-4046-a2a0-fdaea68d9543
-# ╟─3e653573-04db-4913-8771-2c23fe0e01a1
 # ╟─7e9f805c-80c4-472f-a3ea-f73a732b8a57
-# ╟─36e7d4ab-735e-4517-bf2e-ae1db69d227e
-# ╟─bb799c04-0e8c-4f02-a831-0acaa36d20c7
-# ╟─59bc7b62-87f8-42bb-80d0-74d4cf2c9edf
 # ╟─62e93800-22bd-40a1-9ee6-bcd1134539ae
 # ╟─d63c6ac8-3623-426e-b25f-668ffce47ddd
 # ╟─44935b70-11a6-4804-a7cb-150d8660441b
 # ╟─09020d68-05d3-4908-9dcc-c1e0097cd54c
-# ╟─c2c32163-dcbc-4bfc-a172-e3d750ce6c4b
-# ╟─963230d5-cef8-4a9c-aef4-319cbd75c207
 # ╟─e53d6766-4fb1-4bda-822e-9e468b440fdf
-# ╟─3bc0583f-bfa6-49ce-9352-f5b504279ce3
 # ╟─1ce61116-86e3-4488-b2ec-a0d7617bb4b3
-# ╠═1121402e-69d9-4d3b-bec9-c4011e226675
-# ╟─ec77269a-6cf8-420f-a7ef-75f15e30de28
-# ╟─b8ec7c40-5075-4cd9-89dd-b649e53d8558
+# ╟─1121402e-69d9-4d3b-bec9-c4011e226675
 # ╟─b51622f7-baf7-4ab5-861e-dd7f5a707fdb
+# ╟─ec77269a-6cf8-420f-a7ef-75f15e30de28
 # ╟─68a49dcb-3cd9-4905-abf6-d43083d256ce
-# ╟─59069f4e-58fa-458a-8c47-4176e3970f43
-# ╟─17b1760d-ed77-4773-8147-43245c70a962
 # ╟─3b21b28a-52f0-4da0-beba-bb09d666b9c6
 # ╟─f46cbed8-dec6-4bb2-8942-4fe96ebea3e4
-# ╟─acff1e9d-038c-4267-9f85-37e21122988c
 # ╟─aae7b265-1ff7-4d5b-8d93-f0bb0bce575a
 # ╟─2384f27b-05d7-45f8-a18c-75bcdea14b80
 # ╟─58b75f36-b9f5-4192-a796-73f65e497df2
-# ╠═34fa0f41-fae2-4854-8055-d9ee476c3eef
 # ╟─6b5c4ec5-3b54-47e6-ad0b-d9a813b7bb7a
-# ╠═db3dca2a-86ed-4c6e-9477-175092eb538f
+# ╟─db3dca2a-86ed-4c6e-9477-175092eb538f
 # ╟─69f83e46-8788-42ae-945d-3fb27b78a36f
-# ╟─34304691-cdd8-4cc0-a33e-e166c434eb4d
 # ╟─1d9f11ce-1515-4d75-9a30-55db3b3fa8ae
 # ╟─255ce271-2011-4082-acaa-bfd4d972dc7b
-# ╟─4a3292ab-cfa2-4b58-ba66-19a23f8f2a23
-# ╟─8af96ff4-3c14-4667-9a31-d1aa22f927db
 # ╟─3a51761b-8659-4c42-9612-28d6daaf7404
+# ╟─e8222797-77df-40d2-b9bd-279ed3c12cde
+# ╟─06eede8c-1dda-4a15-a69c-6019ee11269d
 # ╟─a494b98a-08df-464c-b3f4-584463f4210c
-# ╟─d4eb252e-5d56-405d-9004-0cc0cbe05b98
-# ╟─7d7fba67-c78a-44fe-bd9b-d8d4967b32c7
-# ╟─e30755c3-e701-4fd6-a244-6755ed6603d3
-# ╟─173f7237-e446-4220-90ab-ab8d9cad8b64
-# ╟─79e5a375-3c16-4443-86b9-d3bbad6101d4
+# ╟─fb7ddbe7-6f42-4a6d-8d28-611df2cdf549
 # ╟─7f720fc1-3004-41af-a570-46183ed4b646
 # ╟─c344a8d1-da07-4206-87d2-92924e133001
+# ╟─6926b12f-d5e9-475a-8248-2a4f0e0f18b5
 # ╟─22ebdf59-a508-44f3-9db8-031b37c4446d
 # ╟─2d40a7b2-f650-45e0-978e-eca24954faa6
+# ╟─acf3b224-3aa7-4419-92a1-fd2b1ee582ce
 # ╟─a40a805d-48a7-4451-b958-56ef041d3333
+# ╟─200c1f28-0eb3-459f-91f8-a0c38cb92bed
+# ╟─59069f4e-58fa-458a-8c47-4176e3970f43
+# ╟─17b1760d-ed77-4773-8147-43245c70a962
+# ╟─5712b24d-cfff-4c95-8008-dfad4dc32a2c
+# ╟─34304691-cdd8-4cc0-a33e-e166c434eb4d
+# ╟─79e5a375-3c16-4443-86b9-d3bbad6101d4
+# ╟─34fa0f41-fae2-4854-8055-d9ee476c3eef
+# ╟─36e7d4ab-735e-4517-bf2e-ae1db69d227e
+# ╟─519b083c-aa8d-48da-b9ec-6e3cddf94d99
+# ╟─f3bbb76c-14cd-4566-935b-5c1f6949eaf5
+# ╟─2350b4a6-a538-430e-b832-4ecb4a458c4d
+# ╟─2de85bb1-881f-483a-bcdb-2109ed795ec5
+# ╟─bfc1affc-b392-4884-a35f-55593af7db53
+# ╟─8f239f05-2610-42ce-92c6-968943418328
+# ╟─32a6f1f8-c213-40c1-a6c1-5dc7ce87976e
+# ╟─a435c976-de91-40a6-b536-9cf005027a3b
+# ╟─640c9851-73ba-47ed-84e4-6484f3b793b2
+# ╟─59bc7b62-87f8-42bb-80d0-74d4cf2c9edf
+# ╟─963230d5-cef8-4a9c-aef4-319cbd75c207
+# ╟─d24fbe45-dc19-4946-9958-b3f26650d572
+# ╟─75e5df52-18ab-4046-a2a0-fdaea68d9543
+# ╟─3e653573-04db-4913-8771-2c23fe0e01a1
+# ╟─c2c32163-dcbc-4bfc-a172-e3d750ce6c4b
+# ╟─49a9a26e-6423-47c3-91ca-785c2ccafe24
+# ╟─70e8d18a-fa92-4993-8994-c9a481141e1d
+# ╟─acff1e9d-038c-4267-9f85-37e21122988c
+# ╟─4a3292ab-cfa2-4b58-ba66-19a23f8f2a23
+# ╟─9e5a3e25-8f7a-469e-aa54-846beec8990f
+# ╟─7d7fba67-c78a-44fe-bd9b-d8d4967b32c7
+# ╟─e30755c3-e701-4fd6-a244-6755ed6603d3
 # ╟─769de9c4-6167-4550-be08-320c7c63fe3e
 # ╠═7c2ceba1-6e8a-4a5f-845d-73b97810c099
 # ╟─9d1eadf9-7fe9-4620-b866-4a442033a0b4
@@ -3002,5 +3085,6 @@ version = "1.4.1+0"
 # ╟─96851df0-0aad-44ac-830a-b5062917f4cf
 # ╟─167cc8ad-cb04-47a1-bb25-08e9c345b24e
 # ╟─5edca12e-e708-43d3-b0dc-4b70c1c4ea70
+# ╠═66446e92-0d84-4d2b-9804-a563fbd8e30b
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
